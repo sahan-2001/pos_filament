@@ -15,8 +15,8 @@ class CreatePurchaseOrder extends CreateRecord
         return $data;
     }
 
-    protected function getRedirectUrl(): string
+    public static function getRedirectUrlAfterCreate(): string
     {
-        return $this->getResource()::getUrl('index');
+        return static::getUrl('index');
     }
 }

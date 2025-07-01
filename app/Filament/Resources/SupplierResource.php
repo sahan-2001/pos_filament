@@ -56,13 +56,9 @@ class SupplierResource extends Resource
                 Tables\Columns\TextColumn::make('supplier_id')->sortable()->formatStateUsing(fn ($state) => str_pad($state, 5, '0', STR_PAD_LEFT)),
                 Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('shop_name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('address')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('email')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('phone_1')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('phone_2')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('outstanding_balance')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('creatededBy.email')->label('Requested By Email')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('approvedBy.email')->label('Approved By Email')->sortable()->searchable(),
                 ...(
                 Auth::user()->can('view audit columns')
                     ? [

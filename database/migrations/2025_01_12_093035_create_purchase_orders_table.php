@@ -10,8 +10,7 @@ class CreatePurchaseOrdersTable extends Migration
     {
         Schema::create('purchase_orders', function (Blueprint $table) {
             $table->id();
-            $table->string('provider_type');
-            $table->unsignedBigInteger('provider_id');
+            $table->unsignedBigInteger('supplier_id');
             $table->date('wanted_date');
             $table->text('special_note')->nullable();
             $table->string('status')->default('planned'); 

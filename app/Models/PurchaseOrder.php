@@ -17,8 +17,7 @@ class PurchaseOrder extends Model
     use HasFactory, LogsActivity;
 
     protected $fillable = [
-        'provider_type',
-        'provider_id',
+        'supplier_id',
         'wanted_date',
         'special_note',
         'status', 
@@ -106,6 +105,11 @@ class PurchaseOrder extends Model
     public function supplierAdvanceInvoices()
     {
         return $this->hasMany(SupplierAdvanceInvoice::class);
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 
 }

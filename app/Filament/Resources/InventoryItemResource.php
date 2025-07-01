@@ -49,7 +49,7 @@ class InventoryItemResource extends Resource
                     ])
                     ->required(),
                 Forms\Components\TextInput::make('available_quantity')
-                    ->label('Available Quantity')
+                    ->hidden()
                     ->default(0)
                     ->numeric(),
             ]);

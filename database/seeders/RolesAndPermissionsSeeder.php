@@ -178,10 +178,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'joined_date' => '2010-01-15',
         ]);
         
-        // Create Default categories
-        Category::firstOrCreate(['name' => 'Waste Item']);
-        Category::firstOrCreate(['name' => 'By Products']);
-        
         // // Assign all permissions to the superuser role
         $superuser->assignRole('admin');  // Assigning the superuser role
     }
