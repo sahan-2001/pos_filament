@@ -17,6 +17,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Navigation\NavigationItem;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -52,6 +53,14 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->navigationItems([
+                NavigationItem::make('POS')
+                    ->url('/pos')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->sort(1000)
+                    ->openUrlInNewTab(false)
+                    ->isActiveWhen(fn (): bool => request()->is('pos')),
             ]);
     }
 }

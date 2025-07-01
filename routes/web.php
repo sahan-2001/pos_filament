@@ -23,6 +23,7 @@ use App\Http\Controllers\PerformanceRecordViewController;
 use App\Http\Controllers\SupplierAdvanceInvoiceController;
 use App\Http\Controllers\EndOfDayReportPdfController;
 use App\Http\Controllers\ReleaseMaterialPrintController;
+use App\Http\Controllers\POSController;
 use App\Models\SupplierAdvanceInvoice;
 use Illuminate\Http\Request;  
 use App\Models\SuppAdvInvoicePayment;
@@ -130,3 +131,6 @@ Route::get('/purchase-order/{id}/{random_code}', [POFrontendController::class, '
 
 Route::get('/sample-orders/{id}/{random_code}', [SOFrontendController::class, 'showSampleOrder'])
     ->name('sample-orders.show');
+
+// POS route
+Route::get('/pos', [POSController::class, 'index'])->name('pos.index');

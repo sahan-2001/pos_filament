@@ -2,7 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Facades\Log;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -16,4 +16,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
+});
+
+Route::post('/checkout', function (Request $request) {
+    // Save cart items to database or handle payment logic
+    Log::info('Checkout data', $request->all());
+    return response()->json(['success' => true]);
 });
