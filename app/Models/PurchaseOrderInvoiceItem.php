@@ -15,7 +15,6 @@ class PurchaseOrderInvoiceItem extends Model
         'register_arrival_id',
         'item_id',
         'stored_quantity',
-        'location_id',
         'unit_price',
         'total',
         'created_by',
@@ -30,11 +29,6 @@ class PurchaseOrderInvoiceItem extends Model
     public function item()
     {
         return $this->belongsTo(InventoryItem::class);
-    }
-
-    public function location()
-    {
-        return $this->belongsTo(InventoryLocation::class);
     }
 
     public function inventoryItem()

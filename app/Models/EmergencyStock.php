@@ -14,7 +14,6 @@ class EmergencyStock extends Model
 
     protected $fillable = [
         'item_id',
-        'location_id',
         'quantity',
         'cost',
         'updated_date',
@@ -68,11 +67,6 @@ class EmergencyStock extends Model
     public function item()
     {
         return $this->belongsTo(InventoryItem::class);
-    }
-
-    public function location()
-    {
-        return $this->belongsTo(InventoryLocation::class);
     }
 
     public function creator()

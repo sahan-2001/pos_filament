@@ -26,14 +26,6 @@ class RolesAndPermissionsSeeder extends Seeder
         Permission::firstOrCreate(['name' => 'users.import']);
         Permission::firstOrCreate(['name' => 'users.export']);
 
-        // Customer request permissions
-        Permission::firstOrCreate(['name' => 'view supplier requests']);
-        Permission::firstOrCreate(['name' => 'create supplier requests']);
-        Permission::firstOrCreate(['name' => 'edit supplier requests']);
-        Permission::firstOrCreate(['name' => 'delete supplier requests']);
-        Permission::firstOrCreate(['name' => 'approve supplier requests']);
-        Permission::firstOrCreate(['name' => 'reject supplier requests']);
-
         // Supplier permissions
         Permission::firstOrCreate(['name' => 'view suppliers']);
         Permission::firstOrCreate(['name' => 'create suppliers']);
@@ -49,14 +41,6 @@ class RolesAndPermissionsSeeder extends Seeder
         Permission::firstOrCreate(['name' => 'delete customers']);
         Permission::firstOrCreate(['name' => 'customers.import']);
         Permission::firstOrCreate(['name' => 'customers.export']);
-
-        // Customer request permissions
-        Permission::firstOrCreate(['name' => 'view customer requests']);
-        Permission::firstOrCreate(['name' => 'create customer requests']);
-        Permission::firstOrCreate(['name' => 'edit customer requests']);
-        Permission::firstOrCreate(['name' => 'delete customer requests']);
-        Permission::firstOrCreate(['name' => 'approve customer requests']);
-        Permission::firstOrCreate(['name' => 'reject customer requests']);
 
         // Inventory item permissions
         Permission::firstOrCreate(['name' => 'view inventory items']);
@@ -74,20 +58,6 @@ class RolesAndPermissionsSeeder extends Seeder
         Permission::firstOrCreate(['name' => 'delete purchase orders']);
         Permission::firstOrCreate(['name' => 'purchase_orders.export']);
 
-        // Customer order permissions
-        Permission::firstOrCreate(['name' => 'view customer orders']);
-        Permission::firstOrCreate(['name' => 'create customer orders']);
-        Permission::firstOrCreate(['name' => 'edit customer orders']);
-        Permission::firstOrCreate(['name' => 'delete customer orders']);
-        Permission::firstOrCreate(['name' => 'customer_orders.export']);
-
-        // Sample order permissions
-        Permission::firstOrCreate(['name' => 'view sample orders']);
-        Permission::firstOrCreate(['name' => 'create sample orders']);
-        Permission::firstOrCreate(['name' => 'edit sample orders']);
-        Permission::firstOrCreate(['name' => 'delete sample orders']);
-        Permission::firstOrCreate(['name' => 'sample orders.export']);
-
         // Warehouse permissions
         Permission::firstOrCreate(['name' => 'view warehouses']);
         Permission::firstOrCreate(['name' => 'create warehouses']);
@@ -95,59 +65,10 @@ class RolesAndPermissionsSeeder extends Seeder
         Permission::firstOrCreate(['name' => 'delete warehouses']);
         Permission::firstOrCreate(['name' => 'warehouses.export']);
 
-        // Inventory Location permissions
-        Permission::firstOrCreate(['name' => 'view inventory locations']);
-        Permission::firstOrCreate(['name' => 'create inventory locations']);
-        Permission::firstOrCreate(['name' => 'edit inventory locations']);
-        Permission::firstOrCreate(['name' => 'delete inventory locations']);
-        Permission::firstOrCreate(['name' => 'inventory location.import']);
-        Permission::firstOrCreate(['name' => 'inventory location.export']);
-
-        // Third Party Services permissions
-        Permission::firstOrCreate(['name' => 'view third party services']);
-        Permission::firstOrCreate(['name' => 'create third party services']);
-        Permission::firstOrCreate(['name' => 'edit third party services']);
-        Permission::firstOrCreate(['name' => 'delete third party services']);
-        Permission::firstOrCreate(['name' => 'third party services.export']);
-
-        // Production Machines permissions
-        Permission::firstOrCreate(['name' => 'view production machines']);
-        Permission::firstOrCreate(['name' => 'create production machines']);
-        Permission::firstOrCreate(['name' => 'edit production machines']);
-        Permission::firstOrCreate(['name' => 'delete production machines']);
-        Permission::firstOrCreate(['name' => 'production machines.import']);
-        Permission::firstOrCreate(['name' => 'production machines.export']);
-
-        // Production Line Operations permissions
-        Permission::firstOrCreate(['name' => 'view workstations']);
-        Permission::firstOrCreate(['name' => 'create workstations']);
-        Permission::firstOrCreate(['name' => 'edit workstations']);
-        Permission::firstOrCreate(['name' => 'delete workstations']);
-        Permission::firstOrCreate(['name' => 'workstations.export']);
-
-        // Production Line permissions
-        Permission::firstOrCreate(['name' => 'view production lines']);
-        Permission::firstOrCreate(['name' => 'create production lines']);
-        Permission::firstOrCreate(['name' => 'edit production lines']);
-        Permission::firstOrCreate(['name' => 'delete production lines']);
-        Permission::firstOrCreate(['name' => 'production lines.import']);
-        Permission::firstOrCreate(['name' => 'production-lines.export']);
-
         // Register Arrival permissions
         Permission::firstOrCreate(['name' => 'view register arrivals']);
         Permission::firstOrCreate(['name' => 'create register arrivals']);
         Permission::firstOrCreate(['name' => 're-correct register arrivals']);
-
-        // Release Material permissions
-        Permission::firstOrCreate(['name' => 'view release materials']);
-        Permission::firstOrCreate(['name' => 'create release materials']);
-        Permission::firstOrCreate(['name' => 're-correct release materials']);
-        Permission::firstOrCreate(['name' => 'release materials.export']);
-
-        // Material QC permissions
-        Permission::firstOrCreate(['name' => 'view material qc']);
-        Permission::firstOrCreate(['name' => 'create material qc']);
-        Permission::firstOrCreate(['name' => 're-correct material qc']);
 
         // Activity log permissions
         Permission::firstOrCreate(['name' => 'view self activity logs']);
@@ -163,22 +84,6 @@ class RolesAndPermissionsSeeder extends Seeder
         // Customer advance invoices
         Permission::firstOrCreate(['name' => 'cus_adv_invoice.export']);
         Permission::firstOrCreate(['name' => 'create cus_adv_invoices']);
-
-        // Cutting stations
-        Permission::firstOrCreate(['name' => 'create cutting stations']);
-        Permission::firstOrCreate(['name' => 'cutting_station.export']);
-        
-        // Cutting records
-        Permission::firstOrCreate(['name' => 'create cutting records']);
-        Permission::firstOrCreate(['name' => 'cutting_record.export']);
-
-        // Assign daily operation
-        Permission::firstOrCreate(['name' => 'create assign daily operations']);
-        Permission::firstOrCreate(['name' => 'assign daily operation.export']);
-
-        // Enter performance records
-        Permission::firstOrCreate(['name' => 'create performace records']);
-        Permission::firstOrCreate(['name' => 'performance_record.export']);
 
         // End of day reports
         Permission::firstOrCreate(['name' => 'create end of day reports']);
@@ -206,11 +111,6 @@ class RolesAndPermissionsSeeder extends Seeder
         Permission::firstOrCreate(['name' => 'create emergency stocks']);
         Permission::firstOrCreate(['name' => 'stocks.import']);
         Permission::firstOrCreate(['name' => 'stock.export']);
-
-        // Temporary Operations
-        Permission::firstOrCreate(['name' => 'create temporary operations']);
-        Permission::firstOrCreate(['name' => 'temporary operations.export']);
-
 
 
         // Roles

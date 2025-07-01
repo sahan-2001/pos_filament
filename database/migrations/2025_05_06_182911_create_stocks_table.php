@@ -18,7 +18,6 @@ class CreateStocksTable extends Migration
             $table->unsignedBigInteger('item_id');
             $table->integer('quantity');
             $table->decimal('cost', 10, 2);
-            $table->unsignedBigInteger('location_id');
             $table->unsignedBigInteger('purchase_order_id')->nullable();
             $table->unsignedBigInteger('created_by');
             $table->unsignedBigInteger('updated_by');
@@ -27,7 +26,6 @@ class CreateStocksTable extends Migration
 
             // Foreign key constraints
             $table->foreign('item_id')->references('id')->on('inventory_items')->onDelete('cascade');
-            $table->foreign('location_id')->references('id')->on('inventory_locations')->onDelete('cascade');
             $table->foreign('purchase_order_id')->references('id')->on('purchase_orders')->onDelete('cascade');
         });
     }

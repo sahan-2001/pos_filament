@@ -15,7 +15,6 @@ class Stock extends Model
         'item_id',
         'quantity',
         'cost',
-        'location_id',
         'purchase_order_id', 
         'created_by',
         'updated_by',
@@ -26,10 +25,6 @@ class Stock extends Model
         return $this->belongsTo(InventoryItem::class, 'item_id');
     }
 
-    public function location()
-    {
-        return $this->belongsTo(InventoryLocation::class, 'location_id');
-    }
 
     public function purchaseOrder()
     {

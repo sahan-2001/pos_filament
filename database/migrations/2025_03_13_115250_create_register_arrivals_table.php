@@ -10,7 +10,6 @@ return new class extends Migration {
         Schema::create('register_arrivals', function (Blueprint $table) {
             $table->id();
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders')->nullOnDelete();
-            $table->foreignId('location_id')->constrained('inventory_locations')->cascadeOnDelete();
             $table->date('received_date')->nullable();
             $table->string('invoice_number')->nullable();
             $table->string('image_of_invoice')->nullable();

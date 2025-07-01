@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('emergency_stocks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('item_id')->constrained('inventory_items');
-            $table->foreignId('location_id')->constrained('inventory_locations');
             $table->integer('quantity');
             $table->decimal('cost', 10, 2)->nullable();
             $table->date('received_date');

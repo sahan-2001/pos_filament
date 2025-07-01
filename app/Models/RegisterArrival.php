@@ -16,7 +16,6 @@ class RegisterArrival extends Model
 
     protected $fillable = [
         'purchase_order_id',
-        'location_id',
         'received_date',
         'invoice_number',
         'image_of_invoice',
@@ -35,10 +34,6 @@ class RegisterArrival extends Model
         return $this->belongsTo(PurchaseOrder::class);
     }
 
-    public function location()
-    {
-        return $this->belongsTo(InventoryLocation::class);
-    }
 
     /**
      * Configure activity logging options.

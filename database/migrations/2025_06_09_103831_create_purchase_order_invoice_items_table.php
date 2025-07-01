@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignId('register_arrival_id')->constrained()->onDelete('cascade');
             $table->foreignId('item_id')->constrained('inventory_items')->onDelete('cascade');
             $table->decimal('stored_quantity', 10, 2);
-            $table->foreignId('location_id')->constrained('inventory_locations')->onDelete('cascade');
             $table->decimal('unit_price', 10, 2);
             $table->decimal('total', 12, 2)->virtualAs('unit_price * stored_quantity');
 
