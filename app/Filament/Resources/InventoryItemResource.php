@@ -10,8 +10,13 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Components\Section;
 use Filament\Actions;
-
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TextInputFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 
 class InventoryItemResource extends Resource
 {
@@ -20,38 +25,76 @@ class InventoryItemResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
     protected static ?string $navigationGroup = 'Inventory Management'; 
 
-     static function form(Forms\Form $form): Forms\Form
+    static function form(Forms\Form $form): Forms\Form
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('item_code')
-                    ->label('Item Code')
-                    ->disabled()
-                    ->default(fn () => self::generateItemCode()),
-                Forms\Components\TextInput::make('name')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\Select::make('category')
-                    ->label('Category')
-                    ->options(fn () => self::getCategoryOptions())
-                    ->required(),
-                Forms\Components\Textarea::make('special_note')
-                    ->label('Special Note')
-                    ->nullable(),
-                Forms\Components\Select::make('uom')
-                    ->label('Unit of Measure')
-                    ->options([
-                        'kg' => 'Kg',
-                        'liters' => 'Liters',
-                        'meters' => 'Meters',
-                        'pcs' => 'Pcs',
-                        // ...other units...
+                Section::make('Item Details')
+                    ->schema([
+                        Forms\Components\TextInput::make('item_code')
+                            ->label('Item Code')
+                            ->disabled()
+                            ->default(fn () => self::generateItemCode()),
+
+                        Forms\Components\TextInput::make('name')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\Select::make('category')
+                            ->label('Category')
+                            ->options(fn () => self::getCategoryOptions())
+                            ->required(),
+
+                        
+
+                        Forms\Components\Select::make('uom')
+                            ->label('Unit of Measure')
+                            ->options([
+                                'kg' => 'Kg',
+                                'liters' => 'Liters',
+                                'meters' => 'Meters',
+                                'pcs' => 'Pcs',
+                                // ...other units...
+                            ])
+                            ->required(),
+
+                        Forms\Components\TextInput::make('available_quantity')
+                            ->hidden()
+                            ->default(0)
+                            ->numeric(),
+                        
+                        Forms\Components\TextInput::make('barcode')
+                            ->label('Barcode')
+                            ->numeric()
+                            ->nullable(),
                     ])
-                    ->required(),
-                Forms\Components\TextInput::make('available_quantity')
-                    ->hidden()
-                    ->default(0)
-                    ->numeric(),
+                    ->columns(2),
+
+                Section::make('Additional Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('moq')
+                            ->label('Minimum Order Quantity/ Alert Quantity')
+                            ->numeric()
+                            ->nullable(),
+
+                        Forms\Components\TextInput::make('max_stock')
+                            ->label('Maximum Stock Level')
+                            ->numeric()
+                            ->nullable(),
+
+                        Forms\Components\FileUpload::make('image')
+                            ->label('Item Image')
+                            ->image()
+                            ->directory('items')
+                            ->imageEditor()
+                            ->nullable(),
+                        
+                        Forms\Components\Textarea::make('special_note')
+                            ->label('Special Note')
+                            ->nullable(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
             ]);
     }
 
@@ -76,7 +119,19 @@ class InventoryItemResource extends Resource
                     ),
             ])
             ->filters([
-                // Define your filters if needed
+                SelectFilter::make('category')
+                    ->label('Category')
+                    ->options(fn () => InventoryItem::query()->distinct()->pluck('category', 'category')->toArray()),
+
+                SelectFilter::make('uom')
+                    ->label('Unit of Measure')
+                    ->options([
+                        'kg' => 'Kg',
+                        'liters' => 'Liters',
+                        'meters' => 'Meters',
+                        'pcs' => 'Pcs',
+                        // Add more if needed
+                    ]),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()

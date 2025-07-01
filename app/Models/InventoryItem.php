@@ -20,6 +20,9 @@ class InventoryItem extends Model
         'special_note',
         'uom',
         'available_quantity',
+        'moq',
+        'max_stock',
+        'image',
         'created_by',
         'updated_by',
     ];
@@ -87,6 +90,10 @@ class InventoryItem extends Model
         'special_note',
         'uom',
         'available_quantity',
+        'moq',
+        'max_stock',
+        'image',
+        'barcode',
         'created_by',
     ];
 
@@ -102,6 +109,9 @@ class InventoryItem extends Model
                 'special_note',
                 'uom',
                 'available_quantity',
+                'moq',
+                'max_stock',
+                'image',
                 'created_by', 
             ])
             ->useLogName('inventory_item')
