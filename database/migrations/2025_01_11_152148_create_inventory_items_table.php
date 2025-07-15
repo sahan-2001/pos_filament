@@ -20,6 +20,9 @@ class CreateInventoryItemsTable extends Migration
             $table->integer('max_stock')->nullable();
             $table->string('image')->nullable();
             $table->integer('barcode')->nullable();
+            $table->decimal('market_price', 10, 2)->nullable();
+            $table->decimal('selling_price', 10, 2)->default(0.00);
+            $table->decimal('cost', 10, 2)->default(0.00);
             $table->unsignedBigInteger('created_by');
             $table->unsignedBigInteger('updated_by');
             $table->softDeletes();
