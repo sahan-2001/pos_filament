@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Api\CustomerApiController;
 use App\Http\Controllers\Api\ProductApiController;
+use App\Http\Controllers\DraftInvoiceController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -30,3 +31,4 @@ Route::get('/customers/search', [CustomerApiController::class, 'search']);
 Route::get('/customers/{id}', [CustomerApiController::class, 'show']);
 
 Route::get('/products', [ProductApiController::class, 'index']);
+Route::post('/draft-invoices', [DraftInvoiceController::class, 'store']);

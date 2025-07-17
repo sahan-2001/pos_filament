@@ -11,6 +11,8 @@ class ProductApiController extends Controller
     public function index(Request $request)
     {
         $term = $request->get('term');
+        $barcode = $request->get('barcode');
+        $itemCode = $request->get('item_code');
 
         $query = InventoryItem::query()
             ->where('available_quantity', '>', 0);
@@ -18,8 +20,19 @@ class ProductApiController extends Controller
         if ($term) {
             $query->where(function ($q) use ($term) {
                 $q->where('name', 'like', "%{$term}%")
-                  ->orWhere('item_code', 'like', "%{$term}%");
+                ->orWhere('item_code', 'like', "%{$term}%")
+                ->orWhere('barcode', 'like', "%{$term}%");
             });
+        }
+
+        // Add direct search by barcode (exact match)
+        if ($barcode) {
+            $query->where('barcode', $barcode);
+        }
+
+        // Add direct search by item_code (exact match)
+        if ($itemCode) {
+            $query->where('item_code', $itemCode);
         }
 
         $items = $query->get()->map(function ($item) {
