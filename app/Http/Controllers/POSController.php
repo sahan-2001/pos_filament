@@ -11,6 +11,10 @@ class POSController extends Controller
 {
     public function index()
     {
-        return view('pos.index');
+        $user = auth()->user();
+        
+        return view('pos.index', [
+            'user' => $user
+        ]);
     }
 }

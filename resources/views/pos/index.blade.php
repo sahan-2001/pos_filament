@@ -8,12 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
         :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #b38b6d;
-            --accent-color: #e74c3c;
-            --light-color: #f8f9fa;
-            --dark-color: #343a40;
-            --success-color: #28a745;
+        --primary-color: #2c3e50;
+        --secondary-color: #b38b6d;
+        --accent-color: #e74c3c;
+        --light-color: #f8f9fa;
+        --dark-color: #343a40;
+        --success-color: #28a745;
         }
 
         body {
@@ -26,11 +26,99 @@
 
         .container {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 3fr 2fr; 
             gap: 30px;
-            max-width: 1400px;
+            max-width: 90vw;
+            width: 90vw;
             margin: 0 auto;
-            padding: 30px;
+            padding: 0;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 12px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(44,62,80,0.07);
+            padding: 10px 18px;
+            min-height: 48px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .user-info span {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1.08rem;
+        }
+        .user-info #live-datetime {
+            font-weight: 500;
+            color: var(--dark-color);
+            font-size: 1.08rem;
+        }
+        .user-info .btn-nav {
+            background: var(--primary-color);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.97rem;
+            box-shadow: 0 1px 4px rgba(44,62,80,0.07);
+            transition: background 0.2s;
+            border: none;
+            outline: none;
+            display: inline-block;
+        }
+        .user-info .btn-nav:nth-child(1) { background: var(--primary-color);}
+        .user-info .btn-nav:nth-child(2) { background: var(--success-color);}
+        .user-info .btn-nav:nth-child(3) { background: var(--secondary-color);}
+        .user-info .btn-nav:nth-child(4) { background: #23272b;}
+        .user-info .btn-nav:nth-child(5) { background: var(--accent-color);}
+        .user-info .btn-nav:hover {
+            filter: brightness(0.92);
+            box-shadow: 0 2px 8px rgba(44,62,80,0.12);
+        }
+        .user-info .btn-nav:active {
+            filter: brightness(0.85);
+        }
+        .user-info .fas.fa-user {
+            margin-right: 6px;
+            color: var(--secondary-color);
+        }
+        .user-info > div {
+            display: flex;
+            gap: 7px;
+            margin-left: auto;
+        }
+        .user-info .btn-nav.back-dashboard {
+            background: var(--light-color);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+
+        .user-info .btn-nav.back-dashboard:hover {
+            background: var(--primary-color);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(44,62,80,0.12);
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 0;
+            }
+            .user-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 10px 8px;
+            }
+            .user-info > div {
+                margin-left: 0;
+                gap: 5px;
+            }
         }
 
         h1, h2, h3 {
@@ -51,13 +139,33 @@
             border-bottom: 2px solid var(--secondary-color);
         }
 
-        .product-section,
-        .cart-section,
-        .customer-section {
+        .product-section {
+            grid-column: 1 / 2;
             background-color: white;
             border-radius: 8px;
             padding: 25px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .cart-section{
+            grid-column: 2 / 3;
+            background-color: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .customer-section {
+            grid-column: 1 / span 2;
+            background-color: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-section {
+            grid-column: 1 / span 2;
+            background-color: white;
         }
 
         #customer-select,
@@ -475,7 +583,6 @@
             margin-bottom: 10px;
         }
 
-        /* Payment Section Styles */
         .payment-section {
             display: none;
             margin-top: 15px;
@@ -604,7 +711,7 @@
             background-color: rgba(0, 0, 0, 0.7);
             z-index: 1000;
             display: flex;
-            justify-content: center;
+            justify-content: center; 
             align-items: center;
         }
 
@@ -633,6 +740,19 @@
         @media (max-width: 1024px) {
             .container {
                 grid-template-columns: 1fr;
+                max-width: 100vw;
+                width: 100vw;
+                padding: 0;
+            }
+            .product-section,
+            .cart-section {
+                grid-column: 1 / -1;
+            }
+            .customer-section {
+                grid-column: 1 / -1;
+            }
+            .header-section {
+                grid-column: 1 / -1;
             }
             .id-search-container {
                 flex-direction: column;
@@ -651,6 +771,27 @@
 <body>
 
 <div class="container">
+
+    <div class="header-section" style="grid-column: 1 / -1;">
+        @auth
+            <div class="user-info">
+                <span>
+                    <i class="fas fa-user"></i>
+                    User ID: {{ $user->id }}
+                </span>
+                <span id="live-datetime"></span>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <a href="/pos" class="btn-nav">New Bill</a>
+                    <a href="/bills" class="btn-nav">List of Bills</a>
+                    <a href="/draft-bills" class="btn-nav">Draft Bills</a>
+                    <a href="/credit-bills" class="btn-nav">Credit Bills</a>
+                    <a href="/reports/analyze" class="btn-nav">Analyze Report</a>
+                    <a href="/admin" class="btn-nav back-dashboard">← Back to Dashboard</a>
+                </div>
+            </div>
+        @endauth
+    </div>
+
 
     <div class="customer-section" style="grid-column: 1 / -1;">
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
@@ -1685,11 +1826,29 @@
         popup.dataset.productId = product.id;
     }
 
+    itemPopup.addEventListener('keydown', function(e) {
+        const activeId = document.activeElement.id;
+        if (
+            e.key === 'Enter' &&
+            activeId !== 'popup-item-cart-price' &&
+            activeId !== 'popup-item-qty'
+        ) {
+            e.preventDefault();
+            confirmAddToCart();
+        }
+    });
+
     function handlePopupPriceEnter(event) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            document.getElementById('popup-item-qty').focus();
-            document.getElementById('popup-item-qty').select();
+            confirmAddToCart();
+        }
+    }
+
+    function handlePopupQuantityEnter(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            confirmAddToCart();
         }
     }
 
@@ -1757,7 +1916,7 @@
         if (popup.style.display === 'flex') {
             const activeId = document.activeElement.id;
             if (e.key === 'Enter' && activeId !== 'popup-item-cart-price' && activeId !== 'popup-item-qty') {
-                e.preventDefault(); // block unwanted global Enter
+                e.preventDefault(); 
             }
         }
     });
@@ -1790,40 +1949,43 @@
 
     // ========== Save Invoice as draft ==========
     async function saveDraftInvoice() {
-        if (cart.length === 0) {
-            showNotification('error', 'Cannot save an empty cart as draft');
-            playErrorSound();
-            return;
-        }
+    if (cart.length === 0) {
+        showNotification('error', 'Cannot save an empty cart as draft');
+        playErrorSound();
+        return;
+    }
 
-        try {
-            const discount = parseFloat(document.getElementById('discount-input').value) || 0;
-            const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-            const total = subtotal - discount;
+    try {
+        const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+        const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+        const total = subtotal - discount;
 
-            const draftData = {
-                customer_id: selectedCustomer ? selectedCustomer.id : null,
-                subtotal: subtotal,
-                discount: discount,
-                total: total,
-                items: cart.map(item => ({
-                    product_id: item.id,
-                    quantity: item.qty,
-                    cost_price: item.price,
-                    selling_price: item.cartPrice,
-                    line_total: item.total
-                }))
-            };
+        const userId = {{ auth()->id() ?? 'null' }};
 
-            const response = await fetch('/api/draft-invoices', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(draftData)
-            });
+        const draftData = {
+            customer_id: selectedCustomer ? selectedCustomer.id : null,
+            subtotal: subtotal,
+            discount: discount,
+            total: total,
+            items: cart.map(item => ({
+                product_id: item.id,
+                quantity: item.qty,
+                cost_price: item.price,
+                selling_price: item.cartPrice,
+                line_total: item.total
+            })),
+            user_id: userId 
+        };
+
+        const response = await fetch('/api/draft-invoices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(draftData)
+        });
 
             const result = await response.json();
 
@@ -1848,14 +2010,11 @@
 
     // ========== Draft Success Popup ==========
     function showDraftSuccessPopup(invoice) {
-        // Create overlay
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
         
-        // Prevent scrolling when popup is open
         document.body.style.overflow = 'hidden';
 
-        // Create popup container - centered by the overlay's flexbox
         const popup = document.createElement('div');
         popup.className = 'draft-success-popup';
         popup.innerHTML = `
@@ -1887,7 +2046,6 @@
         overlay.appendChild(popup);
         document.body.appendChild(overlay);
 
-        // Focus the close button for accessibility
         setTimeout(() => {
             const closeBtn = popup.querySelector('button');
             if (closeBtn) closeBtn.focus();
@@ -1897,16 +2055,27 @@
     function closeDraftSuccessPopup() {
         const overlay = document.querySelector('.popup-overlay');
         if (overlay) {
-            // Add fade out animation
             overlay.style.animation = 'fadeOut 0.3s ease-out';
             setTimeout(() => {
                 overlay.remove();
-                document.body.style.overflow = ''; // Restore scrolling
+                document.body.style.overflow = ''; 
+                window.location.reload();
             }, 300);
+        } else {
+            window.location.reload();
         }
-        // Return focus to barcode input
-        document.getElementById('barcode-input').focus();
     }
+
+    // Live date/time updater
+    function updateLiveDateTime() {
+        const dtElem = document.getElementById('live-datetime');
+        if (dtElem) {
+            const now = new Date();
+            dtElem.textContent = now.toLocaleString();
+        }
+    }
+    setInterval(updateLiveDateTime, 1000);
+    updateLiveDateTime();
 </script>
 
 </body>

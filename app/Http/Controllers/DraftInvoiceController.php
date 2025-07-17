@@ -15,6 +15,7 @@ class DraftInvoiceController extends Controller
         
         try {
             $validated = $request->validate([
+                'user_id' => 'nullable|exists:users,id',
                 'customer_id' => 'nullable|exists:customers,customer_id',
                 'subtotal' => 'required|numeric|min:0',
                 'discount' => 'required|numeric|min:0',
@@ -27,6 +28,8 @@ class DraftInvoiceController extends Controller
                 'items.*.line_total' => 'required|numeric|min:0',
             ]);
 
+            $userId = auth()->id() ?? $validated['user_id'] ?? null;
+
             $invoiceData = [
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'customer_id' => $validated['customer_id'],
@@ -34,8 +37,8 @@ class DraftInvoiceController extends Controller
                 'discount' => $validated['discount'],
                 'total' => $validated['total'],
                 'status' => 'draft',
-                'created_by' => auth()->id(),
-                'updated_by' => auth()->id(), 
+                'created_by' => $userId, 
+                'updated_by' => $userId,
             ];
 
             $draftInvoice = DraftInvoice::create($invoiceData);
@@ -56,8 +59,8 @@ class DraftInvoiceController extends Controller
                     'cost_price' => $item['cost_price'],
                     'selling_price' => $item['selling_price'],
                     'line_total' => $item['line_total'],
-                    'created_by' => auth()->id(),
-                    'updated_by' => auth()->id(), 
+                    'created_by' => $userId,
+                    'updated_by' => $userId, 
                 ]);
 
                 if ($inventoryItem->track_stock) {
@@ -86,7 +89,8 @@ class DraftInvoiceController extends Controller
                     'total' => $draftInvoice->total,
                     'created_at' => $draftInvoice->created_at->format('Y-m-d H:i:s'),
                     'items_count' => $totalItems,
-                    'items_summary' => $itemsSummary
+                    'items_summary' => $itemsSummary,
+                    'created_by' => $userId, 
                 ],
                 'message' => 'Draft invoice saved successfully!'
             ]);

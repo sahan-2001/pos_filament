@@ -134,3 +134,5 @@ Route::get('/sample-orders/{id}/{random_code}', [SOFrontendController::class, 's
 
 // POS route
 Route::get('/pos', [POSController::class, 'index'])->name('pos.index');
+Route::get('/pos', [POSController::class, 'index'])->middleware('auth');
+Route::view('/draft-bills', 'pos.draft-bills');

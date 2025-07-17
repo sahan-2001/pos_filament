@@ -44,6 +44,7 @@ class ProductApiController extends Controller
                 'market_price' => $item->market_price ?? 0,
                 'selling_price' => $item->selling_price ?? 0,
                 'available_quantity' => $item->available_quantity,
+                'category' => $item->category,
                 'image' => $item->image ? asset("storage/{$item->image}") : null,
             ];
         });

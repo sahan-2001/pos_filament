@@ -12,11 +12,11 @@ class DraftInvoice extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
-        protected $fillable = ['customer_id', 'subtotal', 'discount', 'total', 'created_by', 'updated_by',];
+        protected $fillable = ['customer_id', 'subtotal', 'discount', 'total', 'status', 'created_by', 'updated_by',];
         
         public function customer()
         {
-            return $this->belongsTo(Customer::class);
+            return $this->belongsTo(Customer::class, 'customer_id');
         }
         
         public function user()
