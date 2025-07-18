@@ -60,6 +60,164 @@
         @keyframes rotate {
             100% { transform: rotate(360deg); }
         }
+        
+        /* Enhanced Payment Popup Styles */
+        .popup-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .popup-content {
+            background-color: white;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: #2c3e50;
+            color: white;
+        }
+        
+        .popup-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+        
+        .popup-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        
+        .popup-body {
+            padding: 20px;
+        }
+        
+        .item-detail {
+            display: flex;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            width: 150px;
+            color: #2c3e50;
+        }
+        
+        .payment-button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+        
+        .payment-btn {
+            padding: 0.4rem 1rem;
+            border: 1px solid #ccc;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .payment-btn:hover {
+            background-color: #e2e2e2;
+        }
+        
+        .payment-btn.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .payment-section {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .payment-section.active {
+            display: block;
+        }
+        
+        .price-input {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: right;
+        }
+        
+        .popup-footer {
+            display: flex;
+            justify-content: flex-end;
+            padding: 15px 20px;
+            background-color: #f9f9f9;
+            border-top: 1px solid #eee;
+        }
+        
+        .popup-btn {
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-left: 10px;
+            transition: all 0.2s;
+        }
+        
+        .popup-btn.cancel {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            color: #555;
+        }
+        
+        .popup-btn.confirm {
+            background-color: #28a745;
+            border: 1px solid #28a745;
+            color: white;
+        }
+        
+        .popup-btn.cancel:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .popup-btn.confirm:hover {
+            background-color: #218838;
+            border-color: #218838;
+        }
+        
+        .negative-balance {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .customer-info-row {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -90,7 +248,28 @@
             <div id="bill-modal-body"></div>
         </div>
     </div>
+    
+    <!-- Enhanced Payment Popup -->
+    <div id="payment-popup" class="popup-container" style="display: none;">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h3>Process Payment</h3>
+                <button class="popup-close" onclick="closePaymentPopup()">&times;</button>
+            </div>
+            <div class="popup-body" id="payment-modal-body">
+                <!-- Content will be dynamically inserted here -->
+            </div>
+            <div class="popup-footer">
+                <button class="popup-btn cancel" onclick="closePaymentPopup()">Cancel</button>
+                <button class="popup-btn confirm" onclick="submitPayment()">Complete Payment</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentBill = null;
+        let currentCustomer = null;
+        
         async function loadDraftBills() {
             const content = document.getElementById('draft-bills-content');
             const status = document.getElementById('status-filter').value;
@@ -128,6 +307,7 @@
                     <tbody>`;
 
                 bills.forEach(bill => {
+                    const canPay = bill.status === 'draft' || bill.status === 'partially_paid';
                     html += `<tr>
                         <td>${bill.id}</td>
                         <td>${new Date(bill.created_at).toLocaleString()}</td>
@@ -139,6 +319,7 @@
                         <td>${bill.items_count}</td>
                         <td class="actions">
                             <a onclick="showBillDetails(${bill.id})"><i class="fas fa-eye"></i> View</a>
+                            ${canPay ? `<a onclick="showPayPopup(${bill.id}, '${bill.customer_id || ''}', ${bill.total}, ${bill.discount})"><i class="fas fa-money-bill-wave"></i> Pay</a>` : ''}
                         </td>
                     </tr>`;
                 });
@@ -199,17 +380,253 @@
             document.getElementById('bill-modal').style.display = 'none';
         }
 
-        // Live filtering: reload bills when filter changes
+        async function showPayPopup(id, customer_id, total, discount) {
+            currentBill = { id, customer_id, total, discount };
+            const modal = document.getElementById('payment-popup');
+            const body = document.getElementById('payment-modal-body');
+            
+            // Fetch customer details if available
+            currentCustomer = null;
+            let customerBalance = 0;
+            let customerInfoHtml = '';
+            
+            if (customer_id && customer_id !== 'N/A' && customer_id !== '') {
+                try {
+                    const res = await fetch(`/api/customers/${customer_id}`);
+                    if (res.ok) {
+                        currentCustomer = await res.json();
+                        customerBalance = parseFloat(currentCustomer.remaining_balance || 0);
+                        
+                        customerInfoHtml = `
+                            <div class="customer-info-row">
+                                <div><strong>Customer ID:</strong> ${currentCustomer.id}</div>
+                                <div><strong>Name:</strong> ${currentCustomer.name}</div>
+                                <div><strong>Phone:</strong> ${currentCustomer.phone_1}</div>
+                                <div><strong>Current Balance:</strong> Rs.${customerBalance.toFixed(2)}</div>
+                            </div>
+                        `;
+                    }
+                } catch (e) {
+                    console.error('Error fetching customer details:', e);
+                }
+            }
+            
+            body.innerHTML = `
+                <div class="item-detail">
+                    <span class="detail-label">Order Total:</span>
+                    <span id="payment-total-amount">Rs.${parseFloat(total).toFixed(2)}</span>
+                </div>
+                
+                ${customerInfoHtml}
+                
+                <div class="item-detail">
+                    <span class="detail-label">Payment Method:</span>
+                    <div id="payment-method-buttons" class="payment-button-group">
+                        <button type="button" class="payment-btn active" data-method="cash" onclick="selectPaymentMethod('cash')">Cash</button>
+                        <button type="button" class="payment-btn" data-method="card" onclick="selectPaymentMethod('card')">Card</button>
+                        <button type="button" class="payment-btn" data-method="cheque" onclick="selectPaymentMethod('cheque')">Cheque</button>
+                        ${customer_id && customer_id !== 'N/A' && customer_id !== '' ? 
+                            `<button type="button" class="payment-btn" data-method="credit" onclick="selectPaymentMethod('credit')">Credit</button>` : ''}
+                    </div>
+                    <input type="hidden" id="payment-method" value="cash" />
+                </div>
+                
+                <!-- Cash Payment Section -->
+                <div id="cash-payment-section" class="payment-section active">
+                    <div class="item-detail">
+                        <span class="detail-label">Cash Received:</span>
+                        <input type="number" id="cash-received" class="price-input" value="${parseFloat(total).toFixed(2)}" min="0" step="0.01" 
+                            oninput="calculateCashBalance()" />
+                    </div>
+                    <div class="item-detail">
+                        <span class="detail-label">Balance:</span>
+                        <span id="cash-balance">Rs.0.00</span>
+                    </div>
+                </div>
+                
+                <!-- Card Payment Section -->
+                <div id="card-payment-section" class="payment-section">
+                    <div class="item-detail">
+                        <span class="detail-label">Reference No:</span>
+                        <input type="text" id="card-reference" />
+                    </div>
+                    <div class="item-detail">
+                        <span class="detail-label">Bank (Optional):</span>
+                        <input type="text" id="card-bank" />
+                    </div>
+                </div>
+                
+                <!-- Cheque Payment Section -->
+                <div id="cheque-payment-section" class="payment-section">
+                    <div class="item-detail">
+                        <span class="detail-label">Cheque No:</span>
+                        <input type="text" id="cheque-number" />
+                    </div>
+                    <div class="item-detail">
+                        <span class="detail-label">Bank:</span>
+                        <input type="text" id="cheque-bank" />
+                    </div>
+                    <div class="item-detail">
+                        <span class="detail-label">Remarks (Optional):</span>
+                        <input type="text" id="cheque-remarks" />
+                    </div>
+                </div>
+                
+                <!-- Credit Payment Section -->
+                <div id="credit-payment-section" class="payment-section">
+                    <div class="item-detail">
+                        <span class="detail-label">Current Balance:</span>
+                        <span id="current-credit-balance">Rs.${customerBalance.toFixed(2)}</span>
+                    </div>
+                    <div class="item-detail">
+                        <span class="detail-label">New Balance:</span>
+                        <span id="new-credit-balance">Rs.${(customerBalance + parseFloat(total)).toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+            
+            // Initialize cash balance calculation
+            calculateCashBalance();
+            modal.style.display = 'flex';
+            
+            // Focus on cash received field
+            document.getElementById('cash-received').focus();
+            document.getElementById('cash-received').select();
+        }
+
+        function closePaymentPopup() {
+            document.getElementById('payment-popup').style.display = 'none';
+            currentBill = null;
+            currentCustomer = null;
+        }
+
+        function selectPaymentMethod(method) {
+            // Update active button
+            document.querySelectorAll('.payment-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.payment-btn[data-method="${method}"]`).classList.add('active');
+            
+            // Update hidden field
+            document.getElementById('payment-method').value = method;
+            
+            // Hide all payment sections
+            document.querySelectorAll('.payment-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(`${method}-payment-section`).classList.add('active');
+        }
+
+        function calculateCashBalance() {
+            if (!currentBill) return;
+            
+            const received = parseFloat(document.getElementById('cash-received').value) || 0;
+            const balance = received - currentBill.total;
+            
+            const balanceElement = document.getElementById('cash-balance');
+            balanceElement.textContent = `Rs.${balance.toFixed(2)}`;
+            
+            if (balance < 0) {
+                balanceElement.classList.add('negative-balance');
+            } else {
+                balanceElement.classList.remove('negative-balance');
+            }
+        }
+
+        async function submitPayment() {
+            if (!currentBill) return;
+            
+            const method = document.getElementById('payment-method').value;
+            const paymentData = {
+                method,
+                amount: currentBill.total,
+                remarks: ''
+            };
+            
+            try {
+                // Validate based on payment method
+                if (method === 'cash') {
+                    const received = parseFloat(document.getElementById('cash-received').value) || 0;
+                    if (received < currentBill.total) {
+                        throw new Error('Amount received is less than total');
+                    }
+                    paymentData.amount_received = received;
+                    paymentData.balance = received - currentBill.total;
+                }
+                else if (method === 'card') {
+                    const reference = document.getElementById('card-reference').value.trim();
+                    if (!reference) {
+                        throw new Error('Reference number is required for card payment');
+                    }
+                    paymentData.reference = reference;
+                    paymentData.bank = document.getElementById('card-bank').value.trim();
+                }
+                else if (method === 'cheque') {
+                    const chequeNo = document.getElementById('cheque-number').value.trim();
+                    const bank = document.getElementById('cheque-bank').value.trim();
+                    if (!chequeNo || !bank) {
+                        throw new Error('Cheque number and bank are required');
+                    }
+                    paymentData.cheque_no = chequeNo;
+                    paymentData.bank = bank;
+                    paymentData.remarks = document.getElementById('cheque-remarks').value.trim();
+                }
+                else if (method === 'credit') {
+                    if (!currentBill.customer_id) {
+                        throw new Error('No customer selected for credit payment');
+                    }
+                    paymentData.customer_id = currentBill.customer_id;
+                }
+                
+                // Show loading state
+                const confirmBtn = document.querySelector('.popup-btn.confirm');
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Processing...';
+                
+                // Submit payment
+                const res = await fetch(`/api/draft-invoices/${currentBill.id}/pay`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(paymentData)
+                });
+                
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.message || 'Payment failed');
+                }
+                
+                // Success
+                alert('Payment processed successfully!');
+                closePaymentPopup();
+                loadDraftBills();
+                
+            } catch (error) {
+                console.error('Payment error:', error);
+                alert(error.message || 'Payment failed. Please try again.');
+                
+                // Re-enable button
+                const confirmBtn = document.querySelector('.popup-btn.confirm');
+                if (confirmBtn) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Complete Payment';
+                }
+            }
+        }
+
         document.getElementById('status-filter').addEventListener('change', loadDraftBills);
         document.getElementById('date-filter').addEventListener('change', loadDraftBills);
 
-        // Set max date to today
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('date-filter').setAttribute('max', today);
+            loadDraftBills();
         });
 
-        // Refresh button resets filters and reloads bills
         document.getElementById('refresh-btn').addEventListener('click', function() {
             const btn = this;
             btn.classList.add('refreshing');
@@ -219,9 +636,6 @@
                 setTimeout(() => btn.classList.remove('refreshing'), 700);
             });
         });
-
-        // Initial load
-        loadDraftBills();
     </script>
 </body>
 </html>

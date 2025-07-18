@@ -779,7 +779,9 @@
                     <i class="fas fa-user"></i>
                     User ID: {{ $user->id }}
                 </span>
-                <span id="live-datetime"></span>
+                
+                <span id="live-datetime" style="font-weight: bold;"></span>
+                
                 <div class="flex flex-wrap gap-2 mt-2">
                     <a href="/pos" class="btn-nav">New Bill</a>
                     <a href="/bills" class="btn-nav">List of Bills</a>
@@ -791,6 +793,7 @@
             </div>
         @endauth
     </div>
+
 
 
     <div class="customer-section" style="grid-column: 1 / -1;">
@@ -2071,11 +2074,23 @@
         const dtElem = document.getElementById('live-datetime');
         if (dtElem) {
             const now = new Date();
-            dtElem.textContent = now.toLocaleString();
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            };
+            dtElem.textContent = now.toLocaleString('en-US', options);
         }
     }
-    setInterval(updateLiveDateTime, 1000);
+
+    // Initialize immediately and update every second
     updateLiveDateTime();
+    setInterval(updateLiveDateTime, 1000);
 </script>
 
 </body>

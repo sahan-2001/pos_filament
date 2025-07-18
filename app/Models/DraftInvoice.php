@@ -29,6 +29,11 @@ class DraftInvoice extends Model
             return $this->hasMany(DraftInvoiceItem::class);
         }
 
+        public function payments()
+        {
+            return $this->hasMany(DraftBillPayment::class);
+        }
+
         protected static function booted()
         {
             static::creating(function ($model) {
