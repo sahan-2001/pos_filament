@@ -1720,14 +1720,20 @@
                     throw new Error('No customer selected for credit payment');
                 }
                 paymentData.customer_id = selectedCustomer.id;
-                paymentData.new_balance = parseFloat(document.getElementById('new-credit-balance').textContent.replace('Rs.', ''));
+                // Fix the undefined error with safe navigation
+                const currentBalanceElem = document.getElementById('current-credit-balance');
+                const newBalanceElem = document.getElementById('new-credit-balance');
+                paymentData.current_balance = currentBalanceElem ? parseFloat(currentBalanceElem.textContent.replace('Rs.', '')) || 0 : 0;
+                paymentData.new_balance = newBalanceElem ? parseFloat(newBalanceElem.textContent.replace('Rs.', '')) || 0 : 0;
             }
             
             // Prepare order data
             const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+            const userId = {{ auth()->id() ?? 'null' }};
             
             const order = {
-                customer_id: selectedCustomer ? selectedCustomer.id : null,
+                user_id: userId,
+                customer_id: selectedCustomer ? selectedCustomer.customer_id : null,
                 items: cart.map(item => ({
                     product_id: item.id,
                     quantity: item.qty,
@@ -1737,8 +1743,11 @@
                 subtotal: cart.reduce((sum, item) => sum + item.total, 0),
                 discount: discount,
                 total: total,
+                status: 'completed',
                 payment: paymentData
             };
+
+            console.log('Sending order data:', order);
             
             const res = await fetch('/api/orders', {
                 method: 'POST',
@@ -1749,20 +1758,31 @@
                 body: JSON.stringify(order)
             });
             
-            if (!res.ok) throw new Error('Payment failed');
-            
             const result = await res.json();
             
+            if (!res.ok) {
+                throw new Error(result.message || 'Payment failed');
+            }
+            
             // Success - clear cart and show receipt
+            const savedCart = [...cart]; // Save cart for receipt before clearing
+            
+            // Clear everything first
             cart = [];
             renderCart();
             document.getElementById('discount-input').value = '';
+            resetCustomer(); // Clear customer selection
             closePaymentPopup();
             playSuccessSound();
             showNotification('success', 'Payment processed successfully');
             
-            // Print receipt
-            printReceipt(result.order_id, discount, paymentData);
+            // Print receipt with the saved data
+            printReceipt(result, savedCart, discount, paymentData);
+            
+            // Auto-reload after 3 seconds to start new invoice
+            setTimeout(() => {
+                showReloadNotification();
+            }, 2000);
             
         } catch (error) {
             console.error('Payment error:', error);
@@ -1771,36 +1791,182 @@
         }
     }
 
-    function printReceipt(orderId, discount, paymentData) {
-        // This would be implemented based on your receipt printer setup
-        // Could use a dedicated receipt printing library or API
 
-        // For demo purposes, we'll just show a popup
-        const paymentMethodDetails = {
-            'cash': `Cash Received: Rs.${paymentData.amount_received.toFixed(2)}\nBalance: Rs.${paymentData.balance.toFixed(2)}`,
-            'card': `Card Payment\nReference: ${paymentData.reference}\nBank: ${paymentData.bank || 'N/A'}`,
-            'cheque': `Cheque Payment\nCheque No: ${paymentData.cheque_no}\nBank: ${paymentData.bank}\nRemarks: ${paymentData.remarks || 'N/A'}`,
-            'credit': `Credit Payment\nPrevious Balance: Rs.${(paymentData.new_balance - (document.getElementById('grand-total').textContent.replace('Rs.', ''))).toFixed(2)}\nNew Balance: Rs.${paymentData.new_balance.toFixed(2)}`
-        };
-
+    // print receipt
+    function printReceipt(result, savedCart, discount, paymentData) {
+        const order = result;
+        const orderId = order.order_id || order.id;
+        const orderNumber = order.order_number || `ORD${new Date().getTime()}`;
+        
+        // Create receipt content
         const receiptContent = `
-            <h3>Order #${orderId}</h3>
-            <p>Date: ${new Date().toLocaleString()}</p>
-            ${selectedCustomer ? `<p>Customer: ${selectedCustomer.name} (${selectedCustomer.phone_1})</p>` : ''}
-            <hr>
-            ${cart.map(item => `
-                <p>${item.name} - ${item.qty} x Rs.${item.cartPrice.toFixed(2)} (Orig: Rs.${item.price.toFixed(2)}) = Rs.${item.total.toFixed(2)}</p>
-            `).join('')}
-            <hr>
-            <p>Subtotal: Rs.${(cart.reduce((sum, item) => sum + item.total, 0)).toFixed(2)}</p>
-            <p>Discount: Rs.${discount.toFixed(2)}</p>
-            <p><strong>Total: Rs.${document.getElementById('grand-total').textContent.replace('Rs.', '')}</strong></p>
-            <hr>
-            <p>Payment Method: ${paymentData.method.toUpperCase()}</p>
-            <p>${paymentMethodDetails[paymentData.method]}</p>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Receipt - Order #${orderNumber}</title>
+                <style>
+                    body { 
+                        font-family: 'Courier New', monospace; 
+                        margin: 0; 
+                        padding: 15px; 
+                        font-size: 14px;
+                        max-width: 300px;
+                    }
+                    .header { 
+                        text-align: center; 
+                        margin-bottom: 15px;
+                        border-bottom: 2px dashed #000;
+                        padding-bottom: 10px;
+                    }
+                    .company-name { 
+                        font-weight: bold; 
+                        font-size: 18px;
+                        margin-bottom: 5px;
+                    }
+                    .receipt-title { 
+                        font-size: 16px; 
+                        margin: 10px 0;
+                    }
+                    .line { 
+                        border-bottom: 1px dashed #ccc; 
+                        margin: 8px 0;
+                    }
+                    .item-row { 
+                        display: flex; 
+                        justify-content: space-between; 
+                        margin: 5px 0;
+                    }
+                    .item-name { 
+                        flex: 2; 
+                    }
+                    .item-details { 
+                        flex: 1; 
+                        text-align: right;
+                    }
+                    .total-row { 
+                        font-weight: bold; 
+                        border-top: 2px dashed #000;
+                        padding-top: 8px;
+                        margin-top: 8px;
+                    }
+                    .payment-info {
+                        margin-top: 15px;
+                        border-top: 1px dashed #000;
+                        padding-top: 10px;
+                    }
+                    .thank-you {
+                        text-align: center;
+                        margin-top: 20px;
+                        font-weight: bold;
+                    }
+                    @media print {
+                        body { margin: 0; padding: 10px; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="company-name">LUXURY STORE</div>
+                    <div>POS System Receipt</div>
+                    <div class="receipt-title">ORDER #${orderNumber}</div>
+                    <div>${new Date().toLocaleString()}</div>
+                </div>
+
+                ${selectedCustomer ? `
+                <div class="customer-info">
+                    <div><strong>Customer:</strong> ${selectedCustomer.name}</div>
+                    <div><strong>Phone:</strong> ${selectedCustomer.phone_1}</div>
+                    <div class="line"></div>
+                </div>
+                ` : ''}
+
+                <div class="items-section">
+                    <div class="item-row" style="font-weight: bold;">
+                        <div>ITEM</div>
+                        <div>QTY x PRICE</div>
+                        <div>TOTAL</div>
+                    </div>
+                    <div class="line"></div>
+                    ${savedCart.map(item => `
+                        <div class="item-row">
+                            <div class="item-name">${item.name}</div>
+                            <div class="item-details">${item.qty} x Rs.${item.cartPrice.toFixed(2)}</div>
+                            <div class="item-details">Rs.${item.total.toFixed(2)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="line"></div>
+
+                <div class="totals-section">
+                    <div class="item-row">
+                        <div>Subtotal:</div>
+                        <div>Rs.${(savedCart.reduce((sum, item) => sum + item.total, 0)).toFixed(2)}</div>
+                    </div>
+                    ${discount > 0 ? `
+                    <div class="item-row">
+                        <div>Discount:</div>
+                        <div>- Rs.${discount.toFixed(2)}</div>
+                    </div>
+                    ` : ''}
+                    <div class="item-row total-row">
+                        <div>GRAND TOTAL:</div>
+                        <div>Rs.${(savedCart.reduce((sum, item) => sum + item.total, 0) - discount).toFixed(2)}</div>
+                    </div>
+                </div>
+
+                <div class="payment-info">
+                    <div><strong>Payment Method:</strong> ${paymentData.method.toUpperCase()}</div>
+                    ${paymentData.method === 'cash' ? `
+                        <div>Cash Received: Rs.${paymentData.amount_received.toFixed(2)}</div>
+                        <div>Balance: Rs.${paymentData.balance.toFixed(2)}</div>
+                    ` : ''}
+                    ${paymentData.method === 'card' ? `
+                        <div>Reference: ${paymentData.reference}</div>
+                        ${paymentData.bank ? `<div>Bank: ${paymentData.bank}</div>` : ''}
+                    ` : ''}
+                    ${paymentData.method === 'cheque' ? `
+                        <div>Cheque No: ${paymentData.cheque_no}</div>
+                        <div>Bank: ${paymentData.bank}</div>
+                        ${paymentData.remarks ? `<div>Remarks: ${paymentData.remarks}</div>` : ''}
+                    ` : ''}
+                    ${paymentData.method === 'credit' ? `
+                        <div>Previous Balance: Rs.${paymentData.current_balance.toFixed(2)}</div>
+                        <div>New Balance: Rs.${paymentData.new_balance.toFixed(2)}</div>
+                    ` : ''}
+                </div>
+
+                <div class="thank-you">
+                    Thank you for your business!
+                </div>
+
+                <div class="no-print" style="margin-top: 20px; text-align: center;">
+                    <button onclick="window.print()" style="padding: 10px 20px; background: #2c3e50; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px;">
+                        🖨️ Print Receipt
+                    </button>
+                    <button onclick="closeReceipt()" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px;">
+                        ❌ Close
+                    </button>
+                </div>
+            </body>
+            </html>
         `;
 
-        alert(receiptContent); // Replace with actual print functionality
+        // Open receipt in new window
+        const receiptWindow = window.open('', '_blank', 'width=400,height=700,scrollbars=yes');
+        receiptWindow.document.write(receiptContent);
+        receiptWindow.document.close();
+
+        // Auto-print after a short delay (optional)
+        setTimeout(() => {
+            receiptWindow.print();
+        }, 500);
+    }
+
+    // Function to close receipt window
+    function closeReceipt() {
+        window.close();
     }
 
     // ========== Product Popup ==========

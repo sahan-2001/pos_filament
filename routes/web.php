@@ -1,6 +1,5 @@
 <?php
 
-
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PurchaseOrderPdfController;
 use App\Filament\Resources\ActivityLogResource;
@@ -132,7 +131,8 @@ Route::get('/purchase-order/{id}/{random_code}', [POFrontendController::class, '
 Route::get('/sample-orders/{id}/{random_code}', [SOFrontendController::class, 'showSampleOrder'])
     ->name('sample-orders.show');
 
-// POS route
-Route::get('/pos', [POSController::class, 'index'])->name('pos.index');
-Route::get('/pos', [POSController::class, 'index'])->middleware('auth');
+// POS route - UPDATED to use auth:sanctum to match API routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/pos', [POSController::class, 'index'])->name('pos.index');
+});
 Route::view('/draft-bills', 'pos.draft-bills');
