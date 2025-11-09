@@ -16,6 +16,9 @@ return new class extends Migration
             $table->decimal('unit_price', 10, 2)->default(0);
             $table->decimal('original_price', 10, 2)->default(0);
             $table->decimal('line_total', 10, 2)->default(0);
+            $table->decimal('regular_market_price', 10, 2)->default(0);
+            $table->decimal('regular_selling_price', 10, 2)->default(0);
+            $table->decimal('cost', 10, 2)->default(0);
             
             $table->foreignId('created_by')->constrained('users');
             $table->foreignId('updated_by')->constrained('users');

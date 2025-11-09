@@ -234,6 +234,7 @@
             grid-template-columns: repeat(6, 1fr); 
             gap: 12px; 
             margin-top: 20px;
+            min-height: 200px;
         }
 
         .product-card {
@@ -245,6 +246,8 @@
             transition: all 0.3s ease;
             font-size: 0.9rem;
             user-select: none;
+            opacity: 1;
+            transform: translateZ(0);
         }
 
         .product-card img {
@@ -371,6 +374,7 @@
             text-align: center;
             padding: 20px;
             color: #666;
+            transition: opacity 0.3s ease;
         }
 
         .error {
@@ -380,6 +384,7 @@
             background-color: #f8d7da;
             border: 1px solid #f5c6cb;
             border-radius: 4px;
+            transition: opacity 0.3s ease;
         }
 
         .notification {
@@ -537,27 +542,37 @@
 
         .fraction-buttons {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             margin-left: 15px;
+            flex-wrap: wrap;
+            max-width: 300px;
         }
 
         .fraction-btn {
             background-color: var(--primary-color);
             color: white;
             border: none;
-            padding: 10px 20px;   
-            min-width: 40px;    
-            min-height: 25px;     
-            border-radius: 8px;  
-            font-weight: 700;
+            padding: 8px 12px;   
+            min-width: 35px;    
+            min-height: 20px;     
+            border-radius: 6px;  
+            font-weight: 600;
             cursor: pointer;
             transition: background-color 0.3s ease;
-            font-size: 1.2rem;  
+            font-size: 0.9rem;  
             user-select: none;
+            flex: 1;
+            text-align: center;
         }
 
         .fraction-btn:hover {
             background-color: #1a73e8; 
+        }
+
+        .fraction-btn.small {
+            padding: 6px 8px;
+            font-size: 0.8rem;
+            min-width: 30px;
         }
 
         .price-input {
@@ -737,6 +752,20 @@
             to { opacity: 0; }
         }
 
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .highlight-field {
+            animation: highlight 2s ease-in-out;
+        }
+
+        @keyframes highlight {
+            0% { background-color: #ffffcc; }
+            100% { background-color: white; }
+        }
+
         @media (max-width: 1024px) {
             .container {
                 grid-template-columns: 1fr;
@@ -765,6 +794,10 @@
             .payment-section input[type="number"] {
                 width: 100%;
             }
+            .fraction-buttons {
+                max-width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -780,7 +813,7 @@
                     User ID: {{ $user->id }}
                 </span>
                 
-                <span id="live-datetime" style="font-weight: bold;"></span>
+                <span id="live-datetime" style="font-weight: bold; min-width: 280px; text-align: center;"></span>
                 
                 <div class="flex flex-wrap gap-2 mt-2">
                     <a href="/pos" class="btn-nav">New Bill</a>
@@ -878,16 +911,20 @@
                     <input type="number" id="popup-item-cart-price" class="price-input" min="0" step="0.01" 
                         onkeydown="handlePopupPriceEnter(event)" />
                 </div>
+                
+                <!-- Enhanced Fraction Buttons -->
                 <div class="fraction-buttons">
                     <button type="button" class="fraction-btn" onclick="setPopupQuantity(0.25)">¼</button>
                     <button type="button" class="fraction-btn" onclick="setPopupQuantity(0.5)">½</button>
                     <button type="button" class="fraction-btn" onclick="setPopupQuantity(0.75)">¾</button>
+                    <button type="button" class="fraction-btn" onclick="setPopupQuantity(1)">1</button>
                 </div>
+                
                 <div class="quantity-selector">
                     <label for="popup-item-qty">Quantity:</label>
                     <div class="qty-control">
                         <button class="qty-btn" onclick="adjustPopupQuantity(-1)">-</button>
-                        <input type="number" id="popup-item-qty" value="1" min="0.25" step="0.25" max="100" 
+                        <input type="number" id="popup-item-qty" value="1" min="0.1" step="0.1" max="100" 
                             onkeydown="handlePopupQuantityEnter(event)" />
                         <button class="qty-btn" onclick="adjustPopupQuantity(1)">+</button>
                     </div>
@@ -1032,8 +1069,10 @@
     // Global variables
     let cart = [];
     let selectedCustomer = null;
-    let products = [];
+    let allProducts = []; // Store all products for search
     let allowAutoFocus = true;
+
+    // ========== Customer Management ==========
 
     // Fetch all customers for dropdown
     async function fetchCustomers() {
@@ -1159,10 +1198,12 @@
         hideCustomerInfo();
     }
 
+    // ========== Initialization ==========
+
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', async () => {
         await fetchCustomers();
-        await loadProducts();
+        await loadProducts(); // Load products initially
 
         // Set focus to barcode input
         const barcodeInput = document.getElementById('barcode-input');
@@ -1170,6 +1211,10 @@
 
         // Setup event listeners
         setupEventListeners();
+
+        // Start live datetime updates
+        updateLiveDateTime();
+        setInterval(updateLiveDateTime, 1000);
 
         // --- Item popup: click anywhere or press Enter to add to cart ---
         const itemPopup = document.getElementById('item-popup');
@@ -1236,7 +1281,11 @@
 
     async function loadProducts(searchTerm = '') {
         const productGrid = document.getElementById('product-grid');
-        productGrid.innerHTML = '<div class="loading">Loading products...</div>';
+        
+        // Only show loading on initial load, not during search
+        if (!searchTerm && productGrid.innerHTML.includes('Loading products')) {
+            productGrid.innerHTML = '<div class="loading">Loading products...</div>';
+        }
 
         try {
             const params = new URLSearchParams();
@@ -1244,13 +1293,38 @@
 
             const res = await fetch(`/api/products?${params.toString()}`);
             if (!res.ok) throw new Error('Failed to fetch products');
-            products = await res.json();
-
-            renderProducts(products);
+            const fetchedProducts = await res.json();
+            
+            // Store products globally for search functionality
+            if (!searchTerm) {
+                allProducts = fetchedProducts;
+            }
+            
+            renderProducts(fetchedProducts);
         } catch (error) {
             console.error('Error loading products:', error);
             productGrid.innerHTML = '<div class="error">Error loading products</div>';
         }
+    }
+
+    let searchTimeout;
+    function liveSearchProducts() {
+        clearTimeout(searchTimeout);
+        const term = document.getElementById('product-search').value.trim();
+
+        searchTimeout = setTimeout(() => {
+            if (term.length === 0) {
+                // Show all products when search is cleared
+                renderProducts(allProducts);
+            } else {
+                // Filter from the cached products instead of refetching
+                const filtered = allProducts.filter(p =>
+                    p.name.toLowerCase().includes(term.toLowerCase()) ||
+                    (p.item_code && p.item_code.toLowerCase().includes(term.toLowerCase()))
+                );
+                renderProducts(filtered);
+            }
+        }, 500); // Increased delay to reduce blinking
     }
 
     function renderProducts(products) {
@@ -1265,52 +1339,37 @@
             return;
         }
 
-        productGrid.innerHTML = '';
-        products.forEach(product => {
-            const card = document.createElement('div');
-            card.className = 'product-card';
-            card.dataset.id = product.id;
-            card.dataset.name = product.name;
-            card.dataset.price = product.selling_price;
-            card.dataset.stock = product.available_quantity;
+        // Use requestAnimationFrame for smoother rendering
+        requestAnimationFrame(() => {
+            productGrid.innerHTML = '';
+            products.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.dataset.id = product.id;
+                card.dataset.name = product.name;
+                card.dataset.price = product.selling_price;
+                card.dataset.stock = product.available_quantity;
 
-            const imageUrl = product.image || '/images/no-image.png';
-            const marketPrice = product.market_price > product.selling_price
-                ? `<span style="color: #999; text-decoration: line-through; font-size: 0.9rem;">
-                    Rs.${parseFloat(product.market_price).toFixed(2)}
-                </span>`
-                : '';
+                const imageUrl = product.image || '/images/no-image.png';
+                const marketPrice = product.market_price > product.selling_price
+                    ? `<span style="color: #999; text-decoration: line-through; font-size: 0.9rem;">
+                        Rs.${parseFloat(product.market_price).toFixed(2)}
+                    </span>`
+                    : '';
 
-            card.innerHTML = `
-                <img src="${imageUrl}" alt="${product.name}" 
-                    onerror="this.src='/images/no-image.png'">
-                <h3>${product.name}</h3>
-                <div class="price">Rs.${parseFloat(product.selling_price).toFixed(2)}</div>
-                ${marketPrice}
-                <div class="stock">Stock: ${product.available_quantity}</div>
-            `;
+                card.innerHTML = `
+                    <img src="${imageUrl}" alt="${product.name}" 
+                        onerror="this.src='/images/no-image.png'">
+                    <h3>${product.name}</h3>
+                    <div class="price">Rs.${parseFloat(product.selling_price).toFixed(2)}</div>
+                    ${marketPrice}
+                    <div class="stock">Stock: ${product.available_quantity}</div>
+                `;
 
-            card.addEventListener('click', () => showProductPopup(product));
-            productGrid.appendChild(card);
+                card.addEventListener('click', () => showProductPopup(product));
+                productGrid.appendChild(card);
+            });
         });
-    }
-
-    let searchTimeout;
-    function liveSearchProducts() {
-        clearTimeout(searchTimeout);
-        const term = document.getElementById('product-search').value.trim();
-
-        searchTimeout = setTimeout(() => {
-            if (term.length === 0) {
-                renderProducts(products);
-            } else {
-                const filtered = products.filter(p =>
-                    p.name.toLowerCase().includes(term.toLowerCase()) ||
-                    (p.item_code && p.item_code.includes(term))
-                );
-                renderProducts(filtered);
-            }
-        }, 300);
     }
 
     async function handleBarcodeEnter(event) {
@@ -1371,7 +1430,7 @@
 
     function addToCart(productId, productName, price, cartPrice) {
         // Find product in cache to check stock
-        const product = products.find(p => p.id === productId);
+        const product = allProducts.find(p => p.id === productId);
         if (!product) {
             showNotification('error', 'Product not found');
             return;
@@ -1419,10 +1478,10 @@
         const item = cart.find(i => i.id === productId);
         if (!item) return;
 
-        const product = products.find(p => p.id === productId);
-        const newQty = parseFloat((item.qty + delta).toFixed(2));
+        const product = allProducts.find(p => p.id === productId);
+        const newQty = parseFloat((item.qty + delta).toFixed(1));
 
-        if (newQty < 0.25) {
+        if (newQty < 0.1) {
             removeFromCart(productId);
             return;
         }
@@ -1480,7 +1539,7 @@
                     <input type="number" 
                         class="cart-qty-input" 
                         value="${item.qty}" 
-                        min="1" step="1" 
+                        min="0.1" step="0.1" 
                         style="width:60px;" 
                         data-product-id="${item.id}" />
                 </td>
@@ -1498,11 +1557,11 @@
                 const productId = parseInt(e.target.dataset.productId);
                 let newQty = parseFloat(e.target.value);
 
-                if (isNaN(newQty) || newQty < 0.25) {
-                    newQty = 0.25;
+                if (isNaN(newQty) || newQty < 0.1) {
+                    newQty = 0.1;
                 }
 
-                const product = products.find(p => p.id === productId);
+                const product = allProducts.find(p => p.id === productId);
                 if (product && newQty > product.available_quantity) {
                     alert('Not enough stock available');
                     e.target.value = cart.find(i => i.id === productId).qty;
@@ -1536,19 +1595,19 @@
     function adjustPopupQuantity(delta) {
         const input = document.getElementById('popup-item-qty');
         let newVal = parseFloat(input.value) + delta;
-        const min = parseFloat(input.min) || 0.25;
+        const min = parseFloat(input.min) || 0.1;
         const max = parseFloat(input.max) || 100;
 
         if (newVal < min) newVal = min;
         if (newVal > max) newVal = max;
 
-        // Keep 2 decimals, no forced rounding to 0.25 here since user can input
-        input.value = newVal.toFixed(2);
+        // Keep 1 decimal
+        input.value = newVal.toFixed(1);
     }
 
     function setPopupQuantity(value) {
         const input = document.getElementById('popup-item-qty');
-        const min = parseFloat(input.min) || 0.25;
+        const min = parseFloat(input.min) || 0.1;
         const max = parseFloat(input.max) || 100;
         let val = parseFloat(value);
 
@@ -1556,7 +1615,7 @@
         if (val < min) val = min;
         if (val > max) val = max;
 
-        input.value = val.toFixed(2);
+        input.value = val.toFixed(1);
     }
 
     function updateTotals() {
@@ -1680,7 +1739,7 @@
         }
     }
 
-    // Complete payment process
+    // Complete payment process - Updated to use correct field names
     async function completePayment() {
         const method = document.getElementById('payment-method').value;
         const total = parseFloat(document.getElementById('payment-total-amount').textContent.replace('Rs.', ''));
@@ -1727,19 +1786,26 @@
                 paymentData.new_balance = newBalanceElem ? parseFloat(newBalanceElem.textContent.replace('Rs.', '')) || 0 : 0;
             }
             
-            // Prepare order data
+            // Prepare order data with correct field names
             const discount = parseFloat(document.getElementById('discount-input').value) || 0;
             const userId = {{ auth()->id() ?? 'null' }};
             
             const order = {
                 user_id: userId,
                 customer_id: selectedCustomer ? selectedCustomer.customer_id : null,
-                items: cart.map(item => ({
-                    product_id: item.id,
-                    quantity: item.qty,
-                    unit_price: item.cartPrice,
-                    original_price: item.price
-                })),
+                items: cart.map(item => {
+                    const product = allProducts.find(p => p.id === item.id);
+                    return {
+                        product_id: item.id,
+                        quantity: item.qty,
+                        unit_price: item.cartPrice, // This becomes unit_price in OrderItem
+                        original_price: item.price, // This becomes original_price in OrderItem
+                        line_total: item.total, // This becomes line_total in OrderItem
+                        regular_market_price: product ? product.market_price : item.price,
+                        regular_selling_price: product ? product.selling_price : item.price,
+                        cost: product ? product.cost : 0
+                    };
+                }),
                 subtotal: cart.reduce((sum, item) => sum + item.total, 0),
                 discount: discount,
                 total: total,
@@ -1784,6 +1850,7 @@
                 showReloadNotification();
             }, 2000);
             
+            
         } catch (error) {
             console.error('Payment error:', error);
             showNotification('error', error.message || 'Payment failed. Please try again.');
@@ -1791,76 +1858,180 @@
         }
     }
 
-
-    // print receipt
-    function printReceipt(result, savedCart, discount, paymentData) {
-        const order = result;
-        const orderId = order.order_id || order.id;
+    // Print receipt using correct field names from OrderItem model
+    function printReceipt(result, savedCart = [], discount = 0, paymentData = {}, selectedCustomer = null) {
+        const order = result || {};
+        const orderId = order.order_id || order.id || `TEMP-${Date.now()}`;
         const orderNumber = order.order_number || `ORD${new Date().getTime()}`;
-        
-        // Create receipt content
+
+        // if selectedCustomer not provided, try to use order.customer
+        selectedCustomer = selectedCustomer || (order.customer ? {
+            name: order.customer.name,
+            phone_1: order.customer.phone_1
+        } : null);
+
+        // helper to safely get numeric fields with fallbacks
+        const getNumber = (v, fallback = 0) => {
+            const n = typeof v === 'number' ? v : (v ? parseFloat(v) : NaN);
+            return Number.isFinite(n) ? n : fallback;
+        };
+
+        // compute subtotal and total profit
+        let subtotal = 0;
+        let totalProfit = 0;
+
+        // ensure savedCart is an array; allow passing order.items (from API)
+        const items = Array.isArray(savedCart) && savedCart.length ? savedCart : (order.items || []);
+
+        // pre-build item rows html
+        const itemRowsHtml = items.map(item => {
+            // Prefer the explicit OrderItem fields, then fall back to product nested fields, then generic names
+            const regularMarketPrice = getNumber(
+                item.regular_market_price ??
+                item.inventoryItem?.market_price ??
+                item.product?.regular_market_price ??
+                item.product?.market_price ??
+                item.market_price,
+                0
+            );
+
+            const originalPrice = getNumber(
+                item.original_price ??
+                item.final_price ??
+                item.unit_price ??
+                item.inventoryItem?.cost ??
+                item.product?.original_price ??
+                0
+            );
+
+            // line total: prefer stored line_total/total, otherwise compute from quantity * unit_price (selling price)
+            const quantity = getNumber(item.quantity ?? item.qty ?? item.q ?? 0, 0);
+            const unitPrice = getNumber(item.unit_price ?? item.unitPrice ?? item.final_price ?? originalPrice, 0);
+            const lineTotal = getNumber(item.line_total ?? item.total ?? (quantity * unitPrice), 0);
+
+            // profit per line uses market price minus our original price
+            const profitPerItem = regularMarketPrice - originalPrice;
+            const totalProfitPerLine = profitPerItem * quantity;
+
+            subtotal += lineTotal;
+            totalProfit += totalProfitPerLine;
+
+            return `
+                <div class="item-row">
+                    <div class="item-name">
+                        ${escapeHtml(item.name ?? item.inventoryItem?.name ?? item.product?.name ?? 'Item')}
+                        <div class="price-details">× ${quantity}</div>
+                    </div>
+                    <div class="market-price market-price-value">
+                        Rs.${regularMarketPrice.toFixed(2)}
+                    </div>
+                    <div class="our-price our-price-value">
+                        Rs.${originalPrice.toFixed(2)}
+                    </div>
+                    <div class="total-price our-price-value">
+                        Rs.${lineTotal.toFixed(2)}
+                    </div>
+                </div>
+                <div class="price-details line-profit" style="text-align: right; color: #28a745; font-size: 12px;">
+                    Profit: Rs.${totalProfitPerLine.toFixed(2)}
+                </div>
+                <div class="line"></div>
+            `;
+        }).join('');
+
+        // safe paymentData defaults
+        paymentData = paymentData || {};
+        const paymentMethod = (paymentData.method || paymentData.payment_method || 'N/A').toString().toLowerCase();
+
+        // Build receipt HTML
         const receiptContent = `
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Receipt - Order #${orderNumber}</title>
+                <title>Receipt - Order #${orderId}</title>
+                <meta name="viewport" content="width=device-width,initial-scale=1">
                 <style>
+                    :root { --muted: #666; --accent: #2c3e50; --success: #28a745; --paper: #fff; --bg: #f8f9fa; }
                     body { 
-                        font-family: 'Courier New', monospace; 
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace; 
                         margin: 0; 
-                        padding: 15px; 
-                        font-size: 14px;
-                        max-width: 300px;
+                        padding: 12px; 
+                        font-size: 13px;
+                        max-width: 420px;
+                        color: var(--accent);
+                        background: white;
                     }
                     .header { 
                         text-align: center; 
-                        margin-bottom: 15px;
-                        border-bottom: 2px dashed #000;
-                        padding-bottom: 10px;
+                        margin-bottom: 10px;
+                        border-bottom: 1px dashed #ddd;
+                        padding-bottom: 8px;
                     }
                     .company-name { 
-                        font-weight: bold; 
+                        font-weight: 700; 
                         font-size: 18px;
-                        margin-bottom: 5px;
+                        margin-bottom: 3px;
                     }
-                    .receipt-title { 
-                        font-size: 16px; 
+                    .receipt-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+                    .customer-block {
                         margin: 10px 0;
+                        padding: 8px;
+                        background: #fffbea;
+                        border: 1px solid #f0e6a8;
+                        border-radius: 6px;
+                        font-size: 13px;
                     }
-                    .line { 
-                        border-bottom: 1px dashed #ccc; 
-                        margin: 8px 0;
-                    }
-                    .item-row { 
-                        display: flex; 
-                        justify-content: space-between; 
-                        margin: 5px 0;
-                    }
-                    .item-name { 
-                        flex: 2; 
-                    }
-                    .item-details { 
-                        flex: 1; 
-                        text-align: right;
-                    }
-                    .total-row { 
-                        font-weight: bold; 
-                        border-top: 2px dashed #000;
-                        padding-top: 8px;
+                    .customer-block div { margin: 2px 0; }
+                    .items-section {
                         margin-top: 8px;
                     }
-                    .payment-info {
-                        margin-top: 15px;
-                        border-top: 1px dashed #000;
-                        padding-top: 10px;
+                    .item-header {
+                        display: grid;
+                        grid-template-columns: 3fr 1fr 1fr 1fr;
+                        gap: 6px;
+                        font-weight: 700;
+                        font-size: 12px;
+                        color: var(--muted);
+                        padding: 6px 0;
                     }
-                    .thank-you {
+                    .line { border-bottom: 1px dashed #eee; margin: 6px 0; }
+                    .item-row {
+                        display: grid;
+                        grid-template-columns: 3fr 1fr 1fr 1fr;
+                        gap: 6px;
+                        align-items: center;
+                        padding: 6px 0;
+                    }
+                    .item-name { 
+                        font-size: 13px;
+                    }
+                    .price-details { font-size: 12px; color: var(--muted); margin-top: 4px; }
+                    .market-price-value { color: #8a8f98; font-size: 12px; }
+                    .our-price-value { color: var(--accent); font-weight: 700; font-size: 12px; }
+                    .total-price { text-align: right; font-weight: 700; }
+                    .line-profit { margin-top: -6px; margin-bottom: 6px; }
+                    .totals-section { margin-top: 8px; }
+                    .item-row.total-line { display:flex; justify-content:space-between; padding-top:8px; border-top:1px dashed #ddd; font-weight:700; }
+                    .small-muted { font-size:12px; color:var(--muted); }
+                    .profit-total {
+                        font-weight: 700;
+                        font-size: 15px;
+                        color: var(--success);
                         text-align: center;
-                        margin-top: 20px;
-                        font-weight: bold;
+                        margin: 10px 0;
+                        background-color: var(--bg);
+                        padding: 8px;
+                        border-radius: 6px;
+                        border: 1px solid rgba(40,167,69,0.15);
                     }
+                    .payment-info { margin-top: 8px; font-size: 13px; }
+                    .thank-you { text-align:center; margin-top: 10px; font-weight:700; }
+                    .no-print { margin-top: 12px; text-align:center; }
+                    button { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; }
+                    .btn-print { background: var(--accent); color: #fff; margin-right:6px; }
+                    .btn-close { background: #e74c3c; color: #fff; }
                     @media print {
-                        body { margin: 0; padding: 10px; }
+                        body { margin: 0; padding: 6px; max-width: 320px; }
                         .no-print { display: none; }
                     }
                 </style>
@@ -1868,72 +2039,74 @@
             <body>
                 <div class="header">
                     <div class="company-name">LUXURY STORE</div>
-                    <div>POS System Receipt</div>
-                    <div class="receipt-title">ORDER #${orderNumber}</div>
-                    <div>${new Date().toLocaleString()}</div>
+                    <div class="small-muted">POS System Receipt</div>
+                    <div class="receipt-meta">Order #: ${escapeHtml(orderNumber)} • ${new Date().toLocaleString()}</div>
                 </div>
 
-                ${selectedCustomer ? `
-                <div class="customer-info">
-                    <div><strong>Customer:</strong> ${selectedCustomer.name}</div>
-                    <div><strong>Phone:</strong> ${selectedCustomer.phone_1}</div>
-                    <div class="line"></div>
+                <div class="customer-block">
+                    <div><strong>Customer:</strong> ${escapeHtml(selectedCustomer?.name ?? 'Walk-in Customer')}</div>
+                    <div><strong>Phone:</strong> ${escapeHtml(selectedCustomer?.phone_1 ?? order.customer?.phone_1 ?? 'N/A')}</div>
                 </div>
-                ` : ''}
 
                 <div class="items-section">
-                    <div class="item-row" style="font-weight: bold;">
-                        <div>ITEM</div>
-                        <div>QTY x PRICE</div>
-                        <div>TOTAL</div>
+                    <div class="item-header">
+                        <div>ITEM (QTY)</div>
+                        <div style="text-align:center">MARKET PRICE</div>
+                        <div style="text-align:center">OUR PRICE</div>
+                        <div style="text-align:right">TOTAL</div>
                     </div>
+
                     <div class="line"></div>
-                    ${savedCart.map(item => `
-                        <div class="item-row">
-                            <div class="item-name">${item.name}</div>
-                            <div class="item-details">${item.qty} x Rs.${item.cartPrice.toFixed(2)}</div>
-                            <div class="item-details">Rs.${item.total.toFixed(2)}</div>
-                        </div>
-                    `).join('')}
+
+                    ${itemRowsHtml}
+
                 </div>
 
-                <div class="line"></div>
-
                 <div class="totals-section">
-                    <div class="item-row">
+                    <div class="item-row total-line">
                         <div>Subtotal:</div>
-                        <div>Rs.${(savedCart.reduce((sum, item) => sum + item.total, 0)).toFixed(2)}</div>
+                        <div></div>
+                        <div></div>
+                        <div>Rs.${subtotal.toFixed(2)}</div>
                     </div>
-                    ${discount > 0 ? `
-                    <div class="item-row">
+                    ${getNumber(discount, 0) > 0 ? `
+                    <div class="item-row total-line" style="font-weight:600;">
                         <div>Discount:</div>
-                        <div>- Rs.${discount.toFixed(2)}</div>
+                        <div></div>
+                        <div></div>
+                        <div>- Rs.${getNumber(discount).toFixed(2)}</div>
                     </div>
                     ` : ''}
-                    <div class="item-row total-row">
+                    <div class="item-row total-line" style="font-size:15px;">
                         <div>GRAND TOTAL:</div>
-                        <div>Rs.${(savedCart.reduce((sum, item) => sum + item.total, 0) - discount).toFixed(2)}</div>
+                        <div></div>
+                        <div></div>
+                        <div>Rs.${(subtotal - getNumber(discount, 0)).toFixed(2)}</div>
                     </div>
+                </div>
+
+                <div class="profit-total">
+                    YOUR TOTAL PROFIT = Rs.${totalProfit.toFixed(2)}
                 </div>
 
                 <div class="payment-info">
-                    <div><strong>Payment Method:</strong> ${paymentData.method.toUpperCase()}</div>
-                    ${paymentData.method === 'cash' ? `
-                        <div>Cash Received: Rs.${paymentData.amount_received.toFixed(2)}</div>
-                        <div>Balance: Rs.${paymentData.balance.toFixed(2)}</div>
+                    <div><strong>Payment Method:</strong> ${escapeHtml(paymentMethod.toUpperCase())}</div>
+                    ${paymentMethod === 'cash' ? `
+                        <div>Cash Received: Rs.${getNumber(paymentData.amount_received, subtotal).toFixed(2)}</div>
+                        <div>Balance: Rs.${getNumber(paymentData.balance, (getNumber(paymentData.amount_received, subtotal) - (subtotal - getNumber(discount,0)))).toFixed(2)}</div>
                     ` : ''}
-                    ${paymentData.method === 'card' ? `
-                        <div>Reference: ${paymentData.reference}</div>
-                        ${paymentData.bank ? `<div>Bank: ${paymentData.bank}</div>` : ''}
+                    ${paymentMethod === 'card' ? `
+                        <div>Reference: ${escapeHtml(paymentData.reference ?? paymentData.ref ?? 'N/A')}</div>
+                        ${paymentData.bank ? `<div>Bank: ${escapeHtml(paymentData.bank)}</div>` : ''}
                     ` : ''}
-                    ${paymentData.method === 'cheque' ? `
-                        <div>Cheque No: ${paymentData.cheque_no}</div>
-                        <div>Bank: ${paymentData.bank}</div>
-                        ${paymentData.remarks ? `<div>Remarks: ${paymentData.remarks}</div>` : ''}
+                    ${paymentMethod === 'cheque' ? `
+                        <div>Cheque No: ${escapeHtml(paymentData.cheque_no ?? paymentData.chequeNumber ?? 'N/A')}</div>
+                        <div>Bank: ${escapeHtml(paymentData.bank ?? 'N/A')}</div>
+                        ${paymentData.remarks ? `<div>Remarks: ${escapeHtml(paymentData.remarks)}</div>` : ''}
                     ` : ''}
-                    ${paymentData.method === 'credit' ? `
-                        <div>Previous Balance: Rs.${paymentData.current_balance.toFixed(2)}</div>
-                        <div>New Balance: Rs.${paymentData.new_balance.toFixed(2)}</div>
+                    ${paymentMethod === 'credit' ? `
+                        <div>Previous Balance: Rs.${getNumber(paymentData.current_balance, 0).toFixed(2)}</div>
+                        <div>New Balance: Rs.${getNumber(paymentData.new_balance, getNumber(paymentData.current_balance,0) + (subtotal - getNumber(discount,0))).toFixed(2)}</div>
                     ` : ''}
                 </div>
 
@@ -1941,27 +2114,34 @@
                     Thank you for your business!
                 </div>
 
-                <div class="no-print" style="margin-top: 20px; text-align: center;">
-                    <button onclick="window.print()" style="padding: 10px 20px; background: #2c3e50; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px;">
-                        🖨️ Print Receipt
-                    </button>
-                    <button onclick="closeReceipt()" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px;">
-                        ❌ Close
-                    </button>
+                <div class="no-print">
+                    <button class="btn-print" onclick="window.print()">🖨️ Print Receipt</button>
+                    <button class="btn-close" onclick="window.close()">❌ Close</button>
                 </div>
             </body>
             </html>
         `;
 
-        // Open receipt in new window
-        const receiptWindow = window.open('', '_blank', 'width=400,height=700,scrollbars=yes');
+        // Open receipt in new window and write it
+        const receiptWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes');
         receiptWindow.document.write(receiptContent);
         receiptWindow.document.close();
 
-        // Auto-print after a short delay (optional)
+        // Optionally auto-print
         setTimeout(() => {
-            receiptWindow.print();
+            try { receiptWindow.print(); } catch (e) { /* ignore pop-up or cross-origin issues */ }
         }, 500);
+
+        // small HTML-escape helper to avoid injected HTML from item names
+        function escapeHtml(str) {
+            if (str === null || typeof str === 'undefined') return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
     }
 
     // Function to close receipt window
@@ -1987,25 +2167,13 @@
 
         const qtyInput = document.getElementById('popup-item-qty');
         qtyInput.value = 1;
-        qtyInput.min = 0.25;
-        qtyInput.step = 0.25;
+        qtyInput.min = 0.1;
+        qtyInput.step = 0.1;
         qtyInput.max = product.available_quantity;
 
         popup.style.display = 'flex';
         popup.dataset.productId = product.id;
     }
-
-    itemPopup.addEventListener('keydown', function(e) {
-        const activeId = document.activeElement.id;
-        if (
-            e.key === 'Enter' &&
-            activeId !== 'popup-item-cart-price' &&
-            activeId !== 'popup-item-qty'
-        ) {
-            e.preventDefault();
-            confirmAddToCart();
-        }
-    });
 
     function handlePopupPriceEnter(event) {
         if (event.key === 'Enter') {
@@ -2047,7 +2215,7 @@
             return;
         }
 
-        const product = products.find(p => p.id == productId);
+        const product = allProducts.find(p => p.id == productId);
         if (!product) return;
 
         const existingItem = cart.find(item => item.id == productId);
@@ -2115,46 +2283,52 @@
         // new Audio('/sounds/error.mp3').play().catch(e => console.log('Sound error:', e));
     }
 
+    function showReloadNotification() {
+        showNotification('success', 'Starting new invoice...');
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    }
 
     // ========== Save Invoice as draft ==========
     async function saveDraftInvoice() {
-    if (cart.length === 0) {
-        showNotification('error', 'Cannot save an empty cart as draft');
-        playErrorSound();
-        return;
-    }
+        if (cart.length === 0) {
+            showNotification('error', 'Cannot save an empty cart as draft');
+            playErrorSound();
+            return;
+        }
 
-    try {
-        const discount = parseFloat(document.getElementById('discount-input').value) || 0;
-        const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-        const total = subtotal - discount;
+        try {
+            const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+            const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+            const total = subtotal - discount;
 
-        const userId = {{ auth()->id() ?? 'null' }};
+            const userId = {{ auth()->id() ?? 'null' }};
 
-        const draftData = {
-            customer_id: selectedCustomer ? selectedCustomer.id : null,
-            subtotal: subtotal,
-            discount: discount,
-            total: total,
-            items: cart.map(item => ({
-                product_id: item.id,
-                quantity: item.qty,
-                cost_price: item.price,
-                selling_price: item.cartPrice,
-                line_total: item.total
-            })),
-            user_id: userId 
-        };
+            const draftData = {
+                customer_id: selectedCustomer ? selectedCustomer.id : null,
+                subtotal: subtotal,
+                discount: discount,
+                total: total,
+                items: cart.map(item => ({
+                    product_id: item.id,
+                    quantity: item.qty,
+                    cost_price: item.price,
+                    selling_price: item.cartPrice,
+                    line_total: item.total
+                })),
+                user_id: userId 
+            };
 
-        const response = await fetch('/api/draft-invoices', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(draftData)
-        });
+            const response = await fetch('/api/draft-invoices', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(draftData)
+            });
 
             const result = await response.json();
 
@@ -2235,7 +2409,9 @@
         }
     }
 
-    // Live date/time updater
+    // ========== Live Date/Time ==========
+
+    // Live date/time updater - Fixed version
     function updateLiveDateTime() {
         const dtElem = document.getElementById('live-datetime');
         if (dtElem) {
@@ -2253,10 +2429,6 @@
             dtElem.textContent = now.toLocaleString('en-US', options);
         }
     }
-
-    // Initialize immediately and update every second
-    updateLiveDateTime();
-    setInterval(updateLiveDateTime, 1000);
 </script>
 
 </body>

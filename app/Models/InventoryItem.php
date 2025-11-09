@@ -38,11 +38,11 @@ class InventoryItem extends Model
         static::creating(function ($model) {
             // Generate a unique item code
             $model->item_code = self::generateUniqueItemCode($model->category);
-            $model->created_by = auth()->id();
+            $model->created_by = auth()->id() ?? 1; // Default to user ID 1 if no auth
         });
 
         static::updating(function ($model) {
-            $model->updated_by = auth()->id();
+            $model->updated_by = auth()->id() ?? $model->updated_by ?? 1; // Keep existing or default to 1
         });
     }
 
@@ -127,15 +127,33 @@ class InventoryItem extends Model
         return $this->hasMany(RegisterArrivalItem::class, 'item_id');
     }
 
-    protected static function booted()
+    /**
+     * Update available quantity with proper user context
+     */
+    public function updateQuantity($newQuantity, $userId = null)
     {
-        static::creating(function ($model) {
-            $model->created_by = auth()->id();
-            $model->updated_by = auth()->id();
-        });
+        $this->available_quantity = $newQuantity;
+        $this->updated_by = $userId ?? auth()->id() ?? $this->updated_by ?? 1;
+        return $this->save();
+    }
 
-        static::updating(function ($model) {
-            $model->updated_by = auth()->id();
-        });
+    /**
+     * Decrement available quantity with proper user context
+     */
+    public function decrementQuantity($quantity, $userId = null)
+    {
+        $this->available_quantity = $this->available_quantity - $quantity;
+        $this->updated_by = $userId ?? auth()->id() ?? $this->updated_by ?? 1;
+        return $this->save();
+    }
+
+    /**
+     * Increment available quantity with proper user context
+     */
+    public function incrementQuantity($quantity, $userId = null)
+    {
+        $this->available_quantity = $this->available_quantity + $quantity;
+        $this->updated_by = $userId ?? auth()->id() ?? $this->updated_by ?? 1;
+        return $this->save();
     }
 }

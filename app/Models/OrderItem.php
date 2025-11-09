@@ -19,6 +19,9 @@ class OrderItem extends Model
         'unit_price',
         'original_price',
         'line_total',
+        'regular_market_price',
+        'regular_selling_price',
+        'cost',
         'created_by',
         'updated_by'
     ];

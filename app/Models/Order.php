@@ -7,20 +7,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Support\Str;
 
 class Order extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
     protected $fillable = [
-        'customer_id',
+        'order_id', // Add this line
         'user_id',
+        'customer_id',
+        'order_number',
         'subtotal',
         'discount',
         'total',
         'status',
         'order_date',
-        'notes',
         'created_by',
         'updated_by'
     ];
@@ -32,19 +34,83 @@ class Order extends Model
         'order_date' => 'datetime'
     ];
 
-    // Fixed customer relationship - removed the extra parameter
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            // Generate unique order_id based on date
+            if (empty($model->order_id)) {
+                $model->order_id = self::generateOrderId();
+            }
+            
+            // Set created_by if not set
+            if (auth()->check() && empty($model->created_by)) {
+                $model->created_by = auth()->id();
+            }
+        });
+
+        static::updating(function ($model) {
+            // Set updated_by if not set
+            if (auth()->check() && empty($model->updated_by)) {
+                $model->updated_by = auth()->id();
+            }
+        });
+    }
+
+    /**
+     * Generate unique order_id based on date (format: ORD-YYYYMMDD-XXXX)
+     */
+    protected static function generateOrderId(): string
+    {
+        $date = now()->format('Ymd');
+        $prefix = 'ORD';
+        $maxAttempts = 10;
+        $attempt = 0;
+
+        do {
+            $attempt++;
+            
+            // Get the last order for today
+            $lastOrder = self::where('order_id', 'like', $prefix . '-' . $date . '-%')
+                ->orderBy('order_id', 'desc')
+                ->first();
+
+            if ($lastOrder) {
+                // Extract the sequence number and increment
+                $lastId = $lastOrder->order_id;
+                $sequence = (int) substr($lastId, -4) + 1;
+            } else {
+                $sequence = 1;
+            }
+
+            $newOrderId = $prefix . '-' . $date . '-' . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+
+            // Check if order_id already exists (unlikely but possible in race conditions)
+            $exists = self::where('order_id', $newOrderId)->exists();
+
+            if (!$exists) {
+                return $newOrderId;
+            }
+
+            // If we're here, the order_id exists - try again with a higher sequence
+            $sequence++;
+
+        } while ($attempt < $maxAttempts);
+
+        // If all attempts fail (extremely unlikely), fall back to UUID
+        return $prefix . '-' . $date . '-' . substr(Str::uuid()->toString(), 0, 8);
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'customer_id');
     }
 
-    // Fixed user relationship
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-
-    // Removed duplicate userId() method as it's redundant with user()
 
     public function items()
     {
@@ -66,34 +132,35 @@ class Order extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    protected static function booted()
-    {
-        static::creating(function ($model) {
-            if (auth()->check()) {
-                $model->created_by = auth()->id();
-                $model->user_id = auth()->id();
-                $model->updated_by = auth()->id();
-                
-                // Set order_date if not provided
-                if (empty($model->order_date)) {
-                    $model->order_date = now();
-                }
-            }
-        });
+    protected static $logAttributes = [
+        'order_id',
+        'user_id',
+        'customer_id',
+        'order_number',
+        'subtotal',
+        'discount',
+        'total',
+        'status',
+        'order_date'
+    ];
 
-        static::updating(function ($model) {
-            if (auth()->check()) {
-                $model->updated_by = auth()->id();
-            }
-        });
-    }
+    protected static $logName = 'order';
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['customer_id', 'subtotal', 'discount', 'total', 'status', 'order_date'])
-            ->logOnlyDirty()
-            ->dontSubmitEmptyLogs()
-            ->useLogName('orders');
+            ->logOnly([
+                'order_id',
+                'user_id',
+                'customer_id',
+                'order_number',
+                'subtotal',
+                'discount',
+                'total',
+                'status',
+                'order_date'
+            ])
+            ->useLogName('order')
+            ->setDescriptionForEvent(fn(string $eventName) => "Order {$this->order_id} has been {$eventName}");
     }
 }
