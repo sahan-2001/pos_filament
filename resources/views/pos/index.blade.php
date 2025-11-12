@@ -742,6 +742,26 @@
             animation: fadeIn 0.3s ease-out;
         }
 
+        .cart-section table td:nth-child(2) {
+            min-width: 150px;
+        }
+
+        .price-input {
+            width: 80px;
+            padding: 4px 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        .cart-qty-input {
+            width: 60px;
+            padding: 4px 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            text-align: center;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: scale(0.9); }
             to { opacity: 1; transform: scale(1); }
@@ -1351,18 +1371,26 @@
                 card.dataset.stock = product.available_quantity;
 
                 const imageUrl = product.image || '/images/no-image.png';
-                const marketPrice = product.market_price > product.selling_price
-                    ? `<span style="color: #999; text-decoration: line-through; font-size: 0.9rem;">
-                        Rs.${parseFloat(product.market_price).toFixed(2)}
-                    </span>`
-                    : '';
+                
+                // Enhanced price display showing market price crossed out
+                const priceDisplay = product.market_price > product.selling_price
+                    ? `
+                        <div class="price" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                            <span style="color: #999; text-decoration: line-through; font-size: 0.8rem;">
+                                Rs.${parseFloat(product.market_price).toFixed(2)}
+                            </span>
+                            <span style="color: var(--secondary-color); font-weight: 600; font-size: 1rem;">
+                                Rs.${parseFloat(product.selling_price).toFixed(2)}
+                            </span>
+                        </div>
+                    `
+                    : `<div class="price">Rs.${parseFloat(product.selling_price).toFixed(2)}</div>`;
 
                 card.innerHTML = `
                     <img src="${imageUrl}" alt="${product.name}" 
                         onerror="this.src='/images/no-image.png'">
                     <h3>${product.name}</h3>
-                    <div class="price">Rs.${parseFloat(product.selling_price).toFixed(2)}</div>
-                    ${marketPrice}
+                    ${priceDisplay}
                     <div class="stock">Stock: ${product.available_quantity}</div>
                 `;
 
@@ -1523,17 +1551,33 @@
         cartBody.innerHTML = '';
 
         cart.forEach(item => {
+            // Find the product to get market price
+            const product = allProducts.find(p => p.id === item.id);
+            const marketPrice = product ? product.market_price : item.price;
+            const originalPrice = item.price; // Original selling price
+            const unitPrice = item.cartPrice; // Actual price being charged
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${item.name}</td>
                 <td>
-                    <input type="number" 
-                        class="price-input" 
-                        value="${item.cartPrice.toFixed(2)}" 
-                        min="0" step="1"
-                        data-product-id="${item.id}"
-                        onchange="updateCartItemPrice(${item.id}, this.value)" />
-                    <span class="original-price">Rs.${item.price.toFixed(2)}</span>
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <!-- Market Price - Crossed out -->
+                        <div style="color: #999; text-decoration: line-through; font-size: 0.8rem;">
+                            Market: Rs.${parseFloat(marketPrice).toFixed(2)}
+                        </div>
+                        <!-- Unit Price - Actual charged price with input -->
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span style="color: var(--primary-color); font-weight: 600;">Unit:</span>
+                            <input type="number" 
+                                class="price-input" 
+                                value="${unitPrice.toFixed(2)}" 
+                                min="0" step="0.01"
+                                data-product-id="${item.id}"
+                                onchange="updateCartItemPrice(${item.id}, this.value)" 
+                                style="width: 80px; padding: 4px;"/>
+                        </div>
+                    </div>
                 </td>
                 <td>
                     <input type="number" 
@@ -1798,10 +1842,10 @@
                     return {
                         product_id: item.id,
                         quantity: item.qty,
-                        unit_price: item.cartPrice, // This becomes unit_price in OrderItem
-                        original_price: item.price, // This becomes original_price in OrderItem
-                        line_total: item.total, // This becomes line_total in OrderItem
-                        regular_market_price: product ? product.market_price : item.price,
+                        unit_price: item.cartPrice, 
+                        original_price: item.price, 
+                        line_total: item.total, 
+                        regular_market_price: product ? product.market_price : item.price, 
                         regular_selling_price: product ? product.selling_price : item.price,
                         cost: product ? product.cost : 0
                     };
@@ -1858,75 +1902,102 @@
         }
     }
 
-    // Print receipt using correct field names from OrderItem model
-    function printReceipt(result, savedCart = [], discount = 0, paymentData = {}, selectedCustomer = null) {
+    // Print receipt with correct market prices and profit calculation
+    function printReceipt(result, savedCart = [], discount = 0, paymentData = {}) {
         const order = result || {};
         const orderId = order.order_id || order.id || `TEMP-${Date.now()}`;
         const orderNumber = order.order_number || `ORD${new Date().getTime()}`;
 
-        // if selectedCustomer not provided, try to use order.customer
-        selectedCustomer = selectedCustomer || (order.customer ? {
-            name: order.customer.name,
-            phone_1: order.customer.phone_1
-        } : null);
-
-        // helper to safely get numeric fields with fallbacks
+        // Helper to safely get numeric fields with fallbacks
         const getNumber = (v, fallback = 0) => {
             const n = typeof v === 'number' ? v : (v ? parseFloat(v) : NaN);
             return Number.isFinite(n) ? n : fallback;
         };
 
-        // compute subtotal and total profit
+        // Compute subtotal and total profit
         let subtotal = 0;
         let totalProfit = 0;
 
-        // ensure savedCart is an array; allow passing order.items (from API)
-        const items = Array.isArray(savedCart) && savedCart.length ? savedCart : (order.items || []);
+        // Use order.items if available (from API response), otherwise use savedCart
+        const items = order.items && order.items.length ? order.items : savedCart;
 
-        // pre-build item rows html
+        console.log('Receipt items data:', items); // Debug log to see what data we have
+
+        // Pre-build item rows HTML with proper market price and profit calculation
         const itemRowsHtml = items.map(item => {
-            // Prefer the explicit OrderItem fields, then fall back to product nested fields, then generic names
-            const regularMarketPrice = getNumber(
-                item.regular_market_price ??
-                item.inventoryItem?.market_price ??
-                item.product?.regular_market_price ??
-                item.product?.market_price ??
-                item.market_price,
+            // MARKET PRICE = regular_market_price from OrderItem model
+            // Try multiple possible field names to find the market price
+            const marketPrice = getNumber(
+                item.regular_market_price ||  // First priority: from OrderItem model
+                item.market_price ||          // Second priority: direct market_price
+                (item.product ? item.product.market_price : null) || // From product relation
+                (item.inventoryItem ? item.inventoryItem.market_price : null) || // From inventory relation
+                item.unit_price ||            // Fallback to unit price if no market price
                 0
             );
 
-            const originalPrice = getNumber(
-                item.original_price ??
-                item.final_price ??
-                item.unit_price ??
-                item.inventoryItem?.cost ??
-                item.product?.original_price ??
+            // OUR PRICE = unit_price from OrderItem model (actual charged price)
+            const ourPrice = getNumber(
+                item.unit_price || // This is the actual price charged
+                item.cartPrice ||
+                item.price ||
                 0
             );
 
-            // line total: prefer stored line_total/total, otherwise compute from quantity * unit_price (selling price)
-            const quantity = getNumber(item.quantity ?? item.qty ?? item.q ?? 0, 0);
-            const unitPrice = getNumber(item.unit_price ?? item.unitPrice ?? item.final_price ?? originalPrice, 0);
-            const lineTotal = getNumber(item.line_total ?? item.total ?? (quantity * unitPrice), 0);
+            // Get cost price for profit calculation
+            const costPrice = getNumber(
+                item.cost ||
+                (item.product ? item.product.cost : null) ||
+                (item.inventoryItem ? item.inventoryItem.cost : null) ||
+                0
+            );
 
-            // profit per line uses market price minus our original price
-            const profitPerItem = regularMarketPrice - originalPrice;
-            const totalProfitPerLine = profitPerItem * quantity;
+            // Get quantity
+            const quantity = getNumber(item.quantity || item.qty || 0, 0);
+            
+            // Calculate line total
+            const lineTotal = getNumber(
+                item.line_total || 
+                item.total || 
+                (quantity * ourPrice), // Use ourPrice (unit_price) for calculation
+                0
+            );
 
             subtotal += lineTotal;
+
+            // Calculate profit: (Unit Price - Cost Price) * Quantity
+            const profitPerItem = ourPrice - costPrice;
+            const totalProfitPerLine = profitPerItem * quantity;
             totalProfit += totalProfitPerLine;
+
+            // Get product name
+            const productName = item.name || 
+                            (item.product ? item.product.name : null) || 
+                            (item.inventoryItem ? item.inventoryItem.name : null) || 
+                            'Item';
+
+            // Debug log for each item
+            console.log('Item details:', {
+                productName,
+                marketPrice,
+                ourPrice,
+                quantity,
+                lineTotal,
+                profitPerLine: totalProfitPerLine,
+                itemData: item // Log the entire item object to see available fields
+            });
 
             return `
                 <div class="item-row">
                     <div class="item-name">
-                        ${escapeHtml(item.name ?? item.inventoryItem?.name ?? item.product?.name ?? 'Item')}
+                        ${escapeHtml(productName)}
                         <div class="price-details">× ${quantity}</div>
                     </div>
                     <div class="market-price market-price-value">
-                        Rs.${regularMarketPrice.toFixed(2)}
+                        Rs.${marketPrice.toFixed(2)}
                     </div>
                     <div class="our-price our-price-value">
-                        Rs.${originalPrice.toFixed(2)}
+                        Rs.${ourPrice.toFixed(2)}
                     </div>
                     <div class="total-price our-price-value">
                         Rs.${lineTotal.toFixed(2)}
@@ -1939,7 +2010,7 @@
             `;
         }).join('');
 
-        // safe paymentData defaults
+        // Safe paymentData defaults
         paymentData = paymentData || {};
         const paymentMethod = (paymentData.method || paymentData.payment_method || 'N/A').toString().toLowerCase();
 
@@ -2045,7 +2116,7 @@
 
                 <div class="customer-block">
                     <div><strong>Customer:</strong> ${escapeHtml(selectedCustomer?.name ?? 'Walk-in Customer')}</div>
-                    <div><strong>Phone:</strong> ${escapeHtml(selectedCustomer?.phone_1 ?? order.customer?.phone_1 ?? 'N/A')}</div>
+                    <div><strong>Phone:</strong> ${escapeHtml(selectedCustomer?.phone_1 ?? 'N/A')}</div>
                 </div>
 
                 <div class="items-section">
@@ -2127,12 +2198,16 @@
         receiptWindow.document.write(receiptContent);
         receiptWindow.document.close();
 
-        // Optionally auto-print
+        // Auto-print after a short delay
         setTimeout(() => {
-            try { receiptWindow.print(); } catch (e) { /* ignore pop-up or cross-origin issues */ }
+            try { 
+                receiptWindow.print(); 
+            } catch (e) { 
+                console.log('Print may be blocked by browser:', e);
+            }
         }, 500);
 
-        // small HTML-escape helper to avoid injected HTML from item names
+        // Small HTML-escape helper to avoid injected HTML from item names
         function escapeHtml(str) {
             if (str === null || typeof str === 'undefined') return '';
             return String(str)
@@ -2157,7 +2232,19 @@
         document.getElementById('popup-item-id').textContent = product.id;
         document.getElementById('popup-item-code').textContent = product.item_code || 'N/A';
         document.getElementById('popup-item-name').textContent = product.name;
-        document.getElementById('popup-item-price').textContent = `Rs.${parseFloat(product.selling_price).toFixed(2)}`;
+        
+        // Show all three prices in the popup
+        document.getElementById('popup-item-price').innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+                <div style="color: #999; text-decoration: line-through;">
+                    Market Price: Rs.${parseFloat(product.market_price).toFixed(2)}
+                </div>
+                <div style="color: #666;">
+                    Original Price: Rs.${parseFloat(product.selling_price).toFixed(2)}
+                </div>
+            </div>
+        `;
+        
         document.getElementById('popup-item-quantity').textContent = product.available_quantity;
 
         const cartPriceInput = document.getElementById('popup-item-cart-price');
@@ -2303,22 +2390,29 @@
             const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
             const total = subtotal - discount;
 
-            const userId = {{ auth()->id() ?? 'null' }};
+            const userId = {{ auth()->id() }};
+
+            // Prepare items data with correct field names
+            const items = cart.map(item => ({
+                product_id: parseInt(item.id),
+                quantity: parseFloat(item.qty),
+                selling_price: parseFloat(item.cartPrice),
+                line_total: parseFloat(item.total)
+            }));
+
+            // Use customer_id from selectedCustomer
+            const customerId = selectedCustomer ? (selectedCustomer.customer_id || selectedCustomer.id) : null;
 
             const draftData = {
-                customer_id: selectedCustomer ? selectedCustomer.id : null,
-                subtotal: subtotal,
-                discount: discount,
-                total: total,
-                items: cart.map(item => ({
-                    product_id: item.id,
-                    quantity: item.qty,
-                    cost_price: item.price,
-                    selling_price: item.cartPrice,
-                    line_total: item.total
-                })),
-                user_id: userId 
+                customer_id: customerId,
+                subtotal: parseFloat(subtotal),
+                discount: parseFloat(discount),
+                total: parseFloat(total),
+                user_id: parseInt(userId),
+                items: items
             };
+
+            console.log('Sending draft data:', draftData); // For debugging
 
             const response = await fetch('/api/draft-invoices', {
                 method: 'POST',
@@ -2332,11 +2426,18 @@
 
             const result = await response.json();
 
-            if (!response.ok || !result.success) {
+            if (!response.ok) {
+                // Handle validation errors or other HTTP errors
+                const errorMessage = result.message || 
+                                (result.errors ? JSON.stringify(result.errors) : `HTTP error! status: ${response.status}`);
+                throw new Error(errorMessage);
+            }
+
+            if (!result.success) {
                 throw new Error(result.message || 'Failed to save draft invoice');
             }
 
-            // Clear cart and inputs
+            // Success - clear cart and show success message
             cart = [];
             renderCart();
             document.getElementById('discount-input').value = '';
@@ -2346,12 +2447,19 @@
 
         } catch (error) {
             console.error('Error saving draft invoice:', error);
-            showNotification('error', error.message || 'Failed to save draft invoice');
+            
+            // Show more detailed error message
+            let errorMessage = error.message || 'Failed to save draft invoice';
+            if (errorMessage.includes('Validation failed') || errorMessage.includes('errors')) {
+                errorMessage = 'Please check your data and try again.';
+            }
+            
+            showNotification('error', errorMessage);
             playErrorSound();
         }
     }
 
-    // ========== Draft Success Popup ==========
+    // ========== Draft Success Popup Functions ==========
     function showDraftSuccessPopup(invoice) {
         const overlay = document.createElement('div');
         overlay.className = 'popup-overlay';
@@ -2360,29 +2468,41 @@
 
         const popup = document.createElement('div');
         popup.className = 'draft-success-popup';
+        
+        // Format items summary safely
+        const itemsSummary = invoice.items_summary && invoice.items_summary.length > 0 
+            ? invoice.items_summary.map(item => 
+                `<li style="margin-bottom: 5px;">${item.name} (${item.quantity} x Rs.${parseFloat(item.price).toFixed(2)}) = Rs.${parseFloat(item.total).toFixed(2)}</li>`
+            ).join('')
+            : '<li>No items</li>';
+
         popup.innerHTML = `
             <div class="popup-content">
                 <h3 style="color: var(--success-color); margin-bottom: 15px;">Draft Saved Successfully!</h3>
                 <div class="invoice-info" style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
                     <p><strong>Draft #:</strong> ${invoice.id}</p>
                     <p><strong>Date:</strong> ${new Date(invoice.created_at).toLocaleString()}</p>
-                    <p><strong>Items:</strong> ${invoice.items_count}</p>
-                    <p><strong>Subtotal:</strong> Rs.${invoice.subtotal.toFixed(2)}</p>
-                    <p><strong>Discount:</strong> Rs.${invoice.discount.toFixed(2)}</p>
-                    <p><strong>Total:</strong> Rs.${invoice.total.toFixed(2)}</p>
+                    <p><strong>Items:</strong> ${invoice.items_count || 0}</p>
+                    <p><strong>Subtotal:</strong> Rs.${parseFloat(invoice.subtotal || 0).toFixed(2)}</p>
+                    <p><strong>Discount:</strong> Rs.${parseFloat(invoice.discount || 0).toFixed(2)}</p>
+                    <p><strong>Total:</strong> Rs.${parseFloat(invoice.total || 0).toFixed(2)}</p>
                 </div>
                 <div class="items-summary" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px;">
                     <h4>Items Summary:</h4>
                     <ul style="padding-left: 20px;">
-                        ${invoice.items_summary.map(item => `
-                            <li style="margin-bottom: 5px;">${item.name} (${item.quantity} x Rs.${item.price.toFixed(2)}) = Rs.${item.total.toFixed(2)}</li>
-                        `).join('')}
+                        ${itemsSummary}
                     </ul>
                 </div>
-                <button onclick="closeDraftSuccessPopup()" 
-                    style="background: var(--primary-color); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;">
-                    Close
-                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closeDraftSuccessPopup()" 
+                        style="background: var(--primary-color); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: 600; flex: 1;">
+                        Continue Shopping
+                    </button>
+                    <button onclick="viewDraftInvoices()" 
+                        style="background: var(--secondary-color); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: 600; flex: 1;">
+                        View Draft Bills
+                    </button>
+                </div>
             </div>
         `;
 
@@ -2395,6 +2515,10 @@
         }, 100);
     }
 
+    function viewDraftInvoices() {
+        window.location.href = '/draft-bills';
+    }
+
     function closeDraftSuccessPopup() {
         const overlay = document.querySelector('.popup-overlay');
         if (overlay) {
@@ -2402,31 +2526,12 @@
             setTimeout(() => {
                 overlay.remove();
                 document.body.style.overflow = ''; 
-                window.location.reload();
+                // Don't reload the page, just clear the cart
+                cart = [];
+                renderCart();
+                document.getElementById('discount-input').value = '';
+                resetCustomer();
             }, 300);
-        } else {
-            window.location.reload();
-        }
-    }
-
-    // ========== Live Date/Time ==========
-
-    // Live date/time updater - Fixed version
-    function updateLiveDateTime() {
-        const dtElem = document.getElementById('live-datetime');
-        if (dtElem) {
-            const now = new Date();
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            };
-            dtElem.textContent = now.toLocaleString('en-US', options);
         }
     }
 </script>

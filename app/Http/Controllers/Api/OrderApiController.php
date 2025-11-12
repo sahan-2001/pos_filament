@@ -353,77 +353,73 @@ class OrderApiController extends Controller
     }
 
     public function getReceipt($id)
-{
-    try {
-        $order = Order::with(['customer', 'items.inventoryItem', 'payment'])
-                    ->findOrFail($id);
+    {
+        try {
+            $order = Order::with(['customer', 'items.inventoryItem', 'payment'])
+                        ->findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'order' => $order,
-            'receipt_data' => [
-                'order_number' => $order->order_id,
-                'order_date' => $order->order_date,
-                'customer_name' => $order->customer ? $order->customer->name : 'Walk-in Customer',
-                'customer_phone' => $order->customer ? $order->customer->phone_1 : 'N/A',
-                'items' => $order->items->map(function($item) {
-                    $regularMarketPrice = $item->regular_market_price ?? $item->inventoryItem?->market_price ?? 0;
-                    $originalPrice      = $item->original_price ?? $item->unit_price ?? $item->inventoryItem?->cost ?? 0;
-
-                    return [
-                        'id' => $item->id,
-                        'product_id' => $item->product_id,
-                        'name' => $item->inventoryItem?->name ?? $item->product?->name ?? 'Item',
-                        'quantity' => (float) $item->quantity,
-                        'unit_price' => (float) $item->unit_price,
-                        'original_price' => (float) $originalPrice,
-                        'regular_market_price' => (float) $regularMarketPrice,
-                        'regular_selling_price' => (float) ($item->regular_selling_price ?? $item->inventoryItem?->selling_price ?? 0),
-                        'cost' => (float) ($item->cost ?? $item->inventoryItem?->cost ?? 0),
-                        'line_total' => (float) $item->line_total,
-                    ];
-                }),
-                'subtotal' => (float) $order->subtotal,
-                'discount' => (float) $order->discount,
-                'total' => (float) $order->total,
-                'payment_method' => $order->payment ? $order->payment->payment_method : 'N/A',
-                'payment_details' => $order->payment ? [
-                    'amount_received' => (float) $order->payment->amount_received,
-                    'balance' => (float) $order->payment->balance,
-                    'reference_number' => $order->payment->reference_number,
-                    'bank_name' => $order->payment->bank_name,
-                    'cheque_number' => $order->payment->cheque_number,
-                    'remarks' => $order->payment->remarks
-                ] : null
-            ]
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to fetch receipt: ' . $e->getMessage()
-        ], 500);
-    }
-}
-
-private function handlePostPaymentActions(Order $order, $paymentData)
-{
-    $emailService = new EmailService();
-    $emailResult = null;
-    $shouldPrint = true;
-
-    // Check if customer has email and send e-bill
-    if ($order->customer && $order->customer->email) {
-        $emailResult = $emailService->sendEbill($order);
-        $shouldPrint = false; // Don't auto-print for customers with email
+            return response()->json([
+                'success' => true,
+                'order' => $order,
+                'receipt_data' => [
+                    'order_number' => $order->order_id,
+                    'order_date' => $order->order_date,
+                    'customer_name' => $order->customer ? $order->customer->name : 'Walk-in Customer',
+                    'customer_phone' => $order->customer ? $order->customer->phone_1 : 'N/A',
+                    'items' => $order->items->map(function($item) {
+                        return [
+                            'id' => $item->id,
+                            'product_id' => $item->product_id,
+                            'name' => $item->inventoryItem?->name ?? 'Item',
+                            'quantity' => (float) $item->quantity,
+                            'unit_price' => (float) $item->unit_price,
+                            'original_price' => (float) $item->original_price,
+                            'regular_market_price' => (float) $item->regular_market_price, // This is crucial
+                            'regular_selling_price' => (float) $item->regular_selling_price,
+                            'cost' => (float) $item->cost,
+                            'line_total' => (float) $item->line_total,
+                        ];
+                    }),
+                    'subtotal' => (float) $order->subtotal,
+                    'discount' => (float) $order->discount,
+                    'total' => (float) $order->total,
+                    'payment_method' => $order->payment ? $order->payment->payment_method : 'N/A',
+                    'payment_details' => $order->payment ? [
+                        'amount_received' => (float) $order->payment->amount_received,
+                        'balance' => (float) $order->payment->balance,
+                        'reference_number' => $order->payment->reference_number,
+                        'bank_name' => $order->payment->bank_name,
+                        'cheque_number' => $order->payment->cheque_number,
+                        'remarks' => $order->payment->remarks
+                    ] : null
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch receipt: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    return [
-        'email_sent' => $emailResult ? $emailResult['success'] : false,
-        'email_message' => $emailResult ? $emailResult['message'] : null,
-        'should_print' => $shouldPrint,
-        'customer_has_email' => $order->customer && $order->customer->email
-    ];
-}
+    private function handlePostPaymentActions(Order $order, $paymentData)
+    {
+        $emailService = new EmailService();
+        $emailResult = null;
+        $shouldPrint = true;
 
+        // Check if customer has email and send e-bill
+        if ($order->customer && $order->customer->email) {
+            $emailResult = $emailService->sendEbill($order);
+            $shouldPrint = false; // Don't auto-print for customers with email
+        }
+
+        return [
+            'email_sent' => $emailResult ? $emailResult['success'] : false,
+            'email_message' => $emailResult ? $emailResult['message'] : null,
+            'should_print' => $shouldPrint,
+            'customer_has_email' => $order->customer && $order->customer->email
+        ];
+    }
 
 }
