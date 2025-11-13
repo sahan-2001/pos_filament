@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DraftInvoice;
 use App\Models\DraftInvoiceItem;
+use App\Models\DraftBillPayment;
 use App\Models\Customer;
 use App\Models\InventoryItem;
+use App\Models\Sale;
+use App\Models\SaleItem;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DraftBillApiController extends Controller
 {
@@ -173,5 +178,245 @@ class DraftBillApiController extends Controller
                 'message' => 'Failed to save draft invoice: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function processPayment(Request $request, $id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $draftInvoice = DraftInvoice::with(['items', 'customer'])->findOrFail($id);
+            
+            // Validate payment data
+            $validated = $request->validate([
+                'method' => 'required|in:cash,card,cheque,credit',
+                'amount' => 'required|numeric|min:0',
+                'remarks' => 'nullable|string',
+                'amount_received' => 'required_if:method,cash|numeric|min:0',
+                'balance' => 'nullable|numeric',
+                'reference' => 'required_if:method,card|string|nullable',
+                'bank' => 'nullable|string',
+                'cheque_no' => 'required_if:method,cheque|string|nullable',
+                'customer_id' => 'required_if:method,credit|string|nullable'
+            ]);
+
+            // Check if draft is already paid
+            if ($draftInvoice->status === 'paid') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This draft invoice is already paid'
+                ], 422);
+            }
+
+            $userId = auth()->id() ?? 1;
+
+            // Prepare payment data
+            $paymentData = [
+                'draft_invoice_id' => $draftInvoice->id,
+                'order_total' => $draftInvoice->total,
+                'payment_type' => $validated['method'],
+                'pay_amount' => $validated['amount'],
+                'reference' => $validated['reference'] ?? null,
+                'bank' => $validated['bank'] ?? null,
+                'remarks' => $validated['remarks'] ?? null,
+                'created_by' => $userId,
+                'updated_by' => $userId,
+            ];
+
+            // Add method-specific data
+            if ($validated['method'] === 'cash') {
+                $paymentData['cash_received'] = $validated['amount_received'];
+                $paymentData['cash_balance'] = $validated['balance'] ?? 0;
+            } elseif ($validated['method'] === 'cheque') {
+                $paymentData['cheque_no'] = $validated['cheque_no'];
+            }
+
+            // Create payment record
+            $payment = DraftBillPayment::create($paymentData);
+
+            $currentBalance = 0;
+            $newBalance = 0;
+
+            // Update customer balance if credit payment
+            if ($validated['method'] === 'credit' && !empty($validated['customer_id'])) {
+                $customer = Customer::where('customer_id', $validated['customer_id'])->first();
+                if ($customer) {
+                    $currentBalance = $customer->remaining_balance;
+                    $customer->remaining_balance += $validated['amount'];
+                    $newBalance = $customer->remaining_balance;
+                    $customer->save();
+                }
+            }
+
+            // after creating DraftBillPayment
+            $paymentRecord = Payment::create([
+                'draft_bill_id' => $draftInvoice->id,
+                'payment_method' => $validated['method'],
+                'amount' => $validated['amount'],
+                'amount_received' => $validated['method'] === 'cash' ? $validated['amount_received'] : null,
+                'balance' => $validated['method'] === 'cash' ? $validated['balance'] : null,
+                'reference_number' => $validated['method'] === 'card' ? $validated['reference'] : null,
+                'cheque_number' => $validated['method'] === 'cheque' ? $validated['cheque_no'] : null,
+                'bank' => $validated['bank'] ?? null,
+                'remarks' => $validated['remarks'] ?? null,
+                'payment_date' => Carbon::now(),
+                'status' => 'completed',
+                'created_by' => $userId,
+                'updated_by' => $userId,
+            ]);
+
+            // Update draft invoice status
+            $draftInvoice->status = 'paid';
+            $draftInvoice->save();
+
+            DB::commit();
+
+            // Generate receipt data with credit balance information
+            $receiptData = $this->generateReceiptData($draftInvoice, $payment, null, [
+                'current_balance' => $currentBalance,
+                'new_balance' => $newBalance
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment processed successfully',
+                'payment_id' => $payment->id,
+                'receipt_data' => $receiptData
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Draft payment error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // GET /api/draft-invoices/{id}/receipt - Get receipt for paid draft
+    public function getReceipt($id)
+    {
+        $draftInvoice = DraftInvoice::with(['items.inventoryItem', 'customer', 'payments'])->findOrFail($id);
+        
+        if ($draftInvoice->status !== 'paid') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice is not paid yet'
+            ], 422);
+        }
+
+        $payment = $draftInvoice->payments->first();
+        $receiptData = $this->generateReceiptData($draftInvoice, $payment);
+
+        return response()->json([
+            'success' => true,
+            'receipt_data' => $receiptData
+        ]);
+    }
+
+    private function convertDraftToSale($draftInvoice, $payment)
+    {
+        // Optional: Convert draft to permanent sale record
+        // You can modify this based on your business logic
+        
+        $sale = Sale::create([
+            'customer_id' => $draftInvoice->customer_id,
+            'total_amount' => $draftInvoice->total,
+            'discount' => $draftInvoice->discount,
+            'tax' => 0, // Adjust as needed
+            'grand_total' => $draftInvoice->total,
+            'payment_status' => 'paid',
+            'sale_date' => Carbon::now(),
+            'created_by' => auth()->id() ?? 1,
+        ]);
+
+        // Create sale items
+        foreach ($draftInvoice->items as $item) {
+            SaleItem::create([
+                'sale_id' => $sale->id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->selling_price,
+                'total_price' => $item->line_total,
+            ]);
+        }
+
+        // Create payment record in payments table
+        Payment::create([
+            'sale_id' => $sale->id,
+            'amount' => $payment->pay_amount,
+            'payment_method' => $payment->payment_type,
+            'payment_date' => Carbon::now(),
+            'reference' => $payment->reference,
+            'status' => 'completed',
+        ]);
+
+        return $sale;
+    }
+
+    private function generateReceiptData($draftInvoice, $payment, $sale = null, $creditData = [])
+    {
+        // Calculate profit for each item
+        $itemsWithProfit = $draftInvoice->items->map(function($item) {
+            $costPrice = $item->cost_price ?? 0;
+            $sellingPrice = $item->selling_price ?? 0;
+            $quantity = $item->quantity ?? 0;
+            $lineTotal = $item->line_total ?? 0;
+            $profitPerItem = $sellingPrice - $costPrice;
+            $totalProfit = $profitPerItem * $quantity;
+
+            return [
+                'name' => $item->inventoryItem->name ?? 'Unknown Product',
+                'quantity' => $quantity,
+                'price' => $sellingPrice,
+                'total' => $lineTotal,
+                'market_price' => $item->inventoryItem->market_price ?? $sellingPrice, // Use market price if available
+                'cost_price' => $costPrice,
+                'profit_per_item' => $profitPerItem,
+                'total_profit' => $totalProfit
+            ];
+        });
+
+        // Calculate total profit
+        $totalProfit = $itemsWithProfit->sum('total_profit');
+
+        return [
+            'receipt_number' => 'RCPT-' . str_pad($payment->id, 6, '0', STR_PAD_LEFT),
+            'invoice_number' => 'DRAFT-' . $draftInvoice->id,
+            'sale_number' => $sale ? 'SALE-' . $sale->id : null,
+            'date' => Carbon::now()->format('Y-m-d H:i:s'),
+            'customer' => [
+                'id' => $draftInvoice->customer_id,
+                'name' => $draftInvoice->customer ? $draftInvoice->customer->name : 'Walk-in Customer',
+                'phone' => $draftInvoice->customer ? $draftInvoice->customer->phone_1 : 'N/A',
+            ],
+            'items' => $itemsWithProfit,
+            'totals' => [
+                'subtotal' => $draftInvoice->subtotal,
+                'discount' => $draftInvoice->discount,
+                'total' => $draftInvoice->total,
+                'total_profit' => $totalProfit
+            ],
+            'payment' => [
+                'method' => $payment->payment_type,
+                'amount' => $payment->pay_amount,
+                'cash_received' => $payment->cash_received,
+                'cash_balance' => $payment->cash_balance,
+                'reference' => $payment->reference,
+                'bank' => $payment->bank,
+                'cheque_no' => $payment->cheque_no,
+                'current_balance' => $creditData['current_balance'] ?? 0,
+                'new_balance' => $creditData['new_balance'] ?? 0,
+            ]
+        ];
     }
 }

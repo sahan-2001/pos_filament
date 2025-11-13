@@ -28,6 +28,8 @@ Route::get('/orders/{id}/receipt', [OrderApiController::class, 'getReceipt']);
 Route::post('/draft-invoices', [DraftBillApiController::class, 'store']);
 Route::get('/draft-invoices', [DraftBillApiController::class, 'index']);
 Route::get('/draft-invoices/{id}', [DraftBillApiController::class, 'show']);
+Route::post('/draft-invoices/{id}/pay', [DraftBillApiController::class, 'processPayment']);
+Route::get('/draft-invoices/{id}/receipt', [DraftBillApiController::class, 'getReceipt']);
 
 Route::post('/checkout', function (Request $request) {
     Log::info('Checkout data', $request->all());

@@ -15,11 +15,21 @@ class DraftBillPayment extends Model
         'order_total',
         'payment_type',
         'pay_amount',
+        'cash_received',
+        'cash_balance',
         'reference',
         'bank',
+        'cheque_no',
         'remarks',
         'created_by',
         'updated_by'
+    ];
+
+    protected $casts = [
+        'order_total' => 'decimal:2',
+        'pay_amount' => 'decimal:2',
+        'cash_received' => 'decimal:2',
+        'cash_balance' => 'decimal:2',
     ];
 
     public function draftInvoice()
@@ -27,13 +37,19 @@ class DraftBillPayment extends Model
         return $this->belongsTo(DraftInvoice::class);
     }
 
-    public function createdBy()
+    protected static function booted()
     {
-        return $this->belongsTo(User::class, 'created_by');
-    }
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->created_by = auth()->id();
+                $model->updated_by = auth()->id();
+            }
+        });
 
-    public function updatedBy()
-    {
-        return $this->belongsTo(User::class, 'updated_by');
+        static::updating(function ($model) {
+            if (auth()->check()) {
+                $model->updated_by = auth()->id();
+            }
+        });
     }
 }

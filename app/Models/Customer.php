@@ -54,12 +54,16 @@ class Customer extends Model
     protected static function booted()
     {
         static::creating(function ($model) {
-            $model->created_by = auth()->id();
-            $model->updated_by = auth()->id();
+            if (auth()->check()) {
+                $model->created_by = auth()->id();
+                $model->updated_by = auth()->id();
+            }
         });
 
         static::updating(function ($model) {
-            $model->updated_by = auth()->id();
+            if (auth()->check()) {
+                $model->updated_by = auth()->id();
+            }
         });
     }
     

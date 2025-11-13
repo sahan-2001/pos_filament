@@ -154,6 +154,30 @@ class OrderApiController extends Controller
             if (!$isDraft && isset($validated['payment'])) {
                 $paymentData = $validated['payment'];
                 
+                // Update customer balance for credit payments - ADD THIS SECTION ABOVE PAYMENT CREATION
+                if ($paymentData['method'] === 'credit' && isset($paymentData['customer_id'])) {
+                    $customer = Customer::find($paymentData['customer_id']);
+                    if ($customer) {
+                        // Calculate new balance: current balance + order total
+                        $currentBalance = $customer->remaining_balance;
+                        $newBalance = $currentBalance + $validated['total'];
+                        
+                        // Include updated_by field to avoid integrity constraint violation
+                        $customer->update([
+                            'remaining_balance' => $newBalance,
+                            'updated_by' => $user->id // Add this line
+                        ]);
+                        
+                        Log::info('Customer balance updated for credit payment:', [
+                            'customer_id' => $customer->customer_id,
+                            'customer_name' => $customer->name,
+                            'current_balance' => $currentBalance,
+                            'order_total' => $validated['total'],
+                            'new_balance' => $newBalance
+                        ]);
+                    }
+                }
+                
                 Payment::create([
                     'order_id' => $order->id,
                     'amount' => $validated['total'],
@@ -171,19 +195,6 @@ class OrderApiController extends Controller
                 ]);
 
                 Log::info('Payment created:', ['order_id' => $order->id, 'method' => $paymentData['method']]);
-
-                // Update customer balance for credit payments
-                if ($paymentData['method'] === 'credit' && isset($paymentData['customer_id'])) {
-                    $customer = Customer::find($paymentData['customer_id']);
-                    if ($customer) {
-                        $newBalance = $paymentData['new_balance'] ?? ($customer->remaining_balance + $validated['total']);
-                        $customer->update(['remaining_balance' => $newBalance]);
-                        Log::info('Customer balance updated:', [
-                            'customer_id' => $customer->id,
-                            'new_balance' => $newBalance
-                        ]);
-                    }
-                }
             }
 
             DB::commit();
@@ -209,6 +220,7 @@ class OrderApiController extends Controller
                 'message' => 'Failed: '.$e->getMessage(),
             ], 500);
         }
+        // REMOVE THE DUPLICATE PAYMENT PROCESSING CODE FROM HERE
     }
 
     // Add method to save draft specifically

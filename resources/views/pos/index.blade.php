@@ -26,7 +26,7 @@
 
         .container {
             display: grid;
-            grid-template-columns: 3fr 2fr; 
+            grid-template-columns: 2.7fr 2.3fr; /* Increased cart width by 10% */
             gap: 30px;
             max-width: 90vw;
             width: 90vw;
@@ -145,6 +145,7 @@
             border-radius: 8px;
             padding: 25px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            min-height: 600px;
         }
         
         .cart-section{
@@ -153,6 +154,8 @@
             border-radius: 8px;
             padding: 25px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            min-height: 600px;
+            width: 100%;
         }
         
         .customer-section {
@@ -231,7 +234,7 @@
 
         .product-grid {
             display: grid;
-            grid-template-columns: repeat(6, 1fr); 
+            grid-template-columns: repeat(5, 1fr); /* Reduced from 6 to 5 to accommodate wider cart */
             gap: 12px; 
             margin-top: 20px;
             min-height: 200px;
@@ -591,7 +594,7 @@
         }
 
         .discount-input {
-            width: 60%;
+            width: 70%; /* Increased width for better visibility */
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -743,11 +746,19 @@
         }
 
         .cart-section table td:nth-child(2) {
-            min-width: 150px;
+            min-width: 180px; /* Increased for better price display */
+        }
+
+        .cart-section table td:nth-child(3) {
+            min-width: 100px; /* Increased for quantity inputs */
+        }
+
+        .cart-section table td:nth-child(4) {
+            min-width: 100px; /* Increased for totals */
         }
 
         .price-input {
-            width: 80px;
+            width: 90px; /* Slightly increased */
             padding: 4px 6px;
             border: 1px solid #ddd;
             border-radius: 3px;
@@ -755,7 +766,7 @@
         }
 
         .cart-qty-input {
-            width: 60px;
+            width: 70px; /* Increased from 60px */
             padding: 4px 6px;
             border: 1px solid #ddd;
             border-radius: 3px;
@@ -818,8 +829,36 @@
                 max-width: 100%;
                 justify-content: center;
             }
+            .product-grid {
+                grid-template-columns: repeat(3, 1fr); /* Adjusted for mobile */
+            }
         }
-    </style>
+
+        /* Additional responsive adjustments */
+        @media (max-width: 768px) {
+            .product-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .cart-section table {
+                font-size: 0.9rem;
+            }
+            
+            .cart-section table td:nth-child(2) {
+                min-width: 140px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .cart-section table {
+                font-size: 0.8rem;
+            }
+        }
+</style>
 </head>
 <body>
 
@@ -840,14 +879,11 @@
                     <a href="/bills" class="btn-nav">List of Bills</a>
                     <a href="/draft-bills" class="btn-nav">Draft Bills</a>
                     <a href="/credit-bills" class="btn-nav">Credit Bills</a>
-                    <a href="/reports/analyze" class="btn-nav">Analyze Report</a>
                     <a href="/admin" class="btn-nav back-dashboard">← Back to Dashboard</a>
                 </div>
             </div>
         @endauth
     </div>
-
-
 
     <div class="customer-section" style="grid-column: 1 / -1;">
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
@@ -1822,12 +1858,22 @@
                 if (!selectedCustomer) {
                     throw new Error('No customer selected for credit payment');
                 }
-                paymentData.customer_id = selectedCustomer.id;
+                
+                // For credit payments, set customer_id and calculate new balance
+                paymentData.customer_id = selectedCustomer.customer_id || selectedCustomer.id;
+                
+                // Get current balance and calculate new balance
+                const currentBalance = parseFloat(selectedCustomer.remaining_balance ?? 0);
+                const newBalance = currentBalance + total;
+                
+                paymentData.current_balance = currentBalance;
+                paymentData.new_balance = newBalance;
+                
                 // Fix the undefined error with safe navigation
                 const currentBalanceElem = document.getElementById('current-credit-balance');
                 const newBalanceElem = document.getElementById('new-credit-balance');
-                paymentData.current_balance = currentBalanceElem ? parseFloat(currentBalanceElem.textContent.replace('Rs.', '')) || 0 : 0;
-                paymentData.new_balance = newBalanceElem ? parseFloat(newBalanceElem.textContent.replace('Rs.', '')) || 0 : 0;
+                paymentData.current_balance = currentBalanceElem ? parseFloat(currentBalanceElem.textContent.replace('Rs.', '')) || 0 : currentBalance;
+                paymentData.new_balance = newBalanceElem ? parseFloat(newBalanceElem.textContent.replace('Rs.', '')) || 0 : newBalance;
             }
             
             // Prepare order data with correct field names
@@ -1836,7 +1882,7 @@
             
             const order = {
                 user_id: userId,
-                customer_id: selectedCustomer ? selectedCustomer.customer_id : null,
+                customer_id: selectedCustomer ? (selectedCustomer.customer_id || selectedCustomer.id) : null,
                 items: cart.map(item => {
                     const product = allProducts.find(p => p.id === item.id);
                     return {
@@ -1881,7 +1927,12 @@
             cart = [];
             renderCart();
             document.getElementById('discount-input').value = '';
-            resetCustomer(); // Clear customer selection
+            
+            // Don't reset customer for credit payments - keep customer selected
+            if (method !== 'credit') {
+                resetCustomer();
+            }
+            
             closePaymentPopup();
             playSuccessSound();
             showNotification('success', 'Payment processed successfully');
@@ -1926,19 +1977,27 @@
         // Pre-build item rows HTML with proper market price and profit calculation
         const itemRowsHtml = items.map(item => {
             // MARKET PRICE = regular_market_price from OrderItem model
-            // Try multiple possible field names to find the market price
             const marketPrice = getNumber(
-                item.regular_market_price ||  // First priority: from OrderItem model
-                item.market_price ||          // Second priority: direct market_price
-                (item.product ? item.product.market_price : null) || // From product relation
-                (item.inventoryItem ? item.inventoryItem.market_price : null) || // From inventory relation
-                item.unit_price ||            // Fallback to unit price if no market price
+                item.regular_market_price ||  // From OrderItem model
+                item.market_price ||          // Fallback to market_price
+                (item.product ? item.product.market_price : null) ||
+                (item.inventoryItem ? item.inventoryItem.market_price : null) ||
+                item.unit_price ||            // Final fallback
                 0
             );
 
-            // OUR PRICE = unit_price from OrderItem model (actual charged price)
+            // OUR PRICE = regular_selling_price from OrderItem model (original selling price)
             const ourPrice = getNumber(
-                item.unit_price || // This is the actual price charged
+                item.regular_selling_price || // This should be the original selling price
+                item.original_price ||        // Fallback to original_price
+                item.unit_price ||            // Fallback to unit_price
+                item.price ||
+                0
+            );
+
+            // ACTUAL CHARGED PRICE = unit_price from OrderItem model
+            const chargedPrice = getNumber(
+                item.unit_price || // This is the actual price charged in the order
                 item.cartPrice ||
                 item.price ||
                 0
@@ -1955,18 +2014,18 @@
             // Get quantity
             const quantity = getNumber(item.quantity || item.qty || 0, 0);
             
-            // Calculate line total
+            // Calculate line total using the ACTUAL CHARGED PRICE
             const lineTotal = getNumber(
                 item.line_total || 
                 item.total || 
-                (quantity * ourPrice), // Use ourPrice (unit_price) for calculation
+                (quantity * chargedPrice), // Use chargedPrice for calculation
                 0
             );
 
             subtotal += lineTotal;
 
-            // Calculate profit: (Unit Price - Cost Price) * Quantity
-            const profitPerItem = ourPrice - costPrice;
+            // Calculate profit: (Charged Price - Cost Price) * Quantity
+            const profitPerItem = chargedPrice - costPrice;
             const totalProfitPerLine = profitPerItem * quantity;
             totalProfit += totalProfitPerLine;
 
@@ -1981,6 +2040,7 @@
                 productName,
                 marketPrice,
                 ourPrice,
+                chargedPrice,
                 quantity,
                 lineTotal,
                 profitPerLine: totalProfitPerLine,
@@ -2077,13 +2137,33 @@
                         font-size: 13px;
                     }
                     .price-details { font-size: 12px; color: var(--muted); margin-top: 4px; }
-                    .market-price-value { color: #8a8f98; font-size: 12px; }
-                    .our-price-value { color: var(--accent); font-weight: 700; font-size: 12px; }
-                    .total-price { text-align: right; font-weight: 700; }
+                    .market-price-value { 
+                        color: #8a8f98; 
+                        font-size: 12px; 
+                        text-decoration: line-through;
+                        text-align: center;
+                    }
+                    .our-price-value { 
+                        color: var(--accent); 
+                        font-weight: 700; 
+                        font-size: 12px;
+                        text-align: center;
+                    }
+                    .total-price { 
+                        text-align: right; 
+                        font-weight: 700; 
+                        color: var(--accent);
+                    }
                     .line-profit { margin-top: -6px; margin-bottom: 6px; }
                     .totals-section { margin-top: 8px; }
-                    .item-row.total-line { display:flex; justify-content:space-between; padding-top:8px; border-top:1px dashed #ddd; font-weight:700; }
-                    .small-muted { font-size:12px; color:var(--muted); }
+                    .item-row.total-line { 
+                        display: flex; 
+                        justify-content: space-between; 
+                        padding-top: 8px; 
+                        border-top: 1px dashed #ddd; 
+                        font-weight: 700; 
+                    }
+                    .small-muted { font-size: 12px; color: var(--muted); }
                     .profit-total {
                         font-weight: 700;
                         font-size: 15px;
@@ -2095,12 +2175,40 @@
                         border-radius: 6px;
                         border: 1px solid rgba(40,167,69,0.15);
                     }
-                    .payment-info { margin-top: 8px; font-size: 13px; }
-                    .thank-you { text-align:center; margin-top: 10px; font-weight:700; }
-                    .no-print { margin-top: 12px; text-align:center; }
-                    button { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; }
-                    .btn-print { background: var(--accent); color: #fff; margin-right:6px; }
-                    .btn-close { background: #e74c3c; color: #fff; }
+                    .payment-info { 
+                        margin-top: 8px; 
+                        font-size: 13px; 
+                        background: #f8f9fa;
+                        padding: 10px;
+                        border-radius: 6px;
+                    }
+                    .payment-info div { margin: 4px 0; }
+                    .thank-you { 
+                        text-align: center; 
+                        margin-top: 10px; 
+                        font-weight: 700; 
+                        color: var(--accent);
+                    }
+                    .no-print { margin-top: 12px; text-align: center; }
+                    button { 
+                        padding: 8px 14px; 
+                        border-radius: 6px; 
+                        border: none; 
+                        cursor: pointer; 
+                        font-weight: 600;
+                        transition: all 0.3s ease;
+                    }
+                    .btn-print { 
+                        background: var(--accent); 
+                        color: #fff; 
+                        margin-right: 6px; 
+                    }
+                    .btn-print:hover { background: #1a252f; }
+                    .btn-close { 
+                        background: #e74c3c; 
+                        color: #fff; 
+                    }
+                    .btn-close:hover { background: #c0392b; }
                     @media print {
                         body { margin: 0; padding: 6px; max-width: 320px; }
                         .no-print { display: none; }

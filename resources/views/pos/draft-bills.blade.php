@@ -269,14 +269,19 @@
     <script>
         let currentBill = null;
         let currentCustomer = null;
-        
+
         async function loadDraftBills() {
             const content = document.getElementById('draft-bills-content');
             const status = document.getElementById('status-filter').value;
             const date = document.getElementById('date-filter').value;
 
             let url = `/api/draft-invoices?`;
-            if (status) url += `status=${encodeURIComponent(status)}&`;
+            // Always filter by draft status by default
+            if (!status) {
+                url += `status=draft&`;
+            } else if (status) {
+                url += `status=${encodeURIComponent(status)}&`;
+            }
             if (date) url += `date=${encodeURIComponent(date)}&`;
 
             content.innerHTML = '<div class="loading">Loading draft bills...</div>';
@@ -286,7 +291,7 @@
                 if (!res.ok) throw new Error('Failed to fetch draft bills');
                 const bills = await res.json();
                 if (!bills.length) {
-                    content.innerHTML = '<div class="loading">No bills found for selected filters.</div>';
+                    content.innerHTML = '<div class="loading">No draft bills found for selected filters.</div>';
                     return;
                 }
 
@@ -378,6 +383,7 @@
 
         function closeModal() {
             document.getElementById('bill-modal').style.display = 'none';
+            location.reload();
         }
 
         async function showPayPopup(id, customer_id, total, discount) {
@@ -595,15 +601,24 @@
                     body: JSON.stringify(paymentData)
                 });
                 
+                const result = await res.json();
+                
                 if (!res.ok) {
-                    const error = await res.json();
-                    throw new Error(error.message || 'Payment failed');
+                    throw new Error(result.message || 'Payment failed');
                 }
                 
-                // Success
-                alert('Payment processed successfully!');
-                closePaymentPopup();
-                loadDraftBills();
+                // Success - show receipt and auto-print
+                if (result.success && result.receipt_data) {
+                    showReceipt(result.receipt_data);
+                    // Auto-print after a short delay
+                    setTimeout(() => {
+                        printStyledReceipt(result.receipt_data);
+                    }, 1000);
+                } else {
+                    alert('Payment processed successfully!');
+                    closePaymentPopup();
+                    loadDraftBills();
+                }
                 
             } catch (error) {
                 console.error('Payment error:', error);
@@ -618,19 +633,423 @@
             }
         }
 
+        function showReceipt(receiptData) {
+            const modal = document.getElementById('payment-popup');
+            const body = document.getElementById('payment-modal-body');
+            const footer = document.querySelector('.popup-footer');
+            
+            // Build receipt HTML in the same style as your print function
+            let receiptHtml = `
+                <div style="text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #ddd; padding-bottom: 10px;">
+                    <h3 style="margin: 0; color: #2c3e50;">LUXURY STORE</h3>
+                    <p style="margin: 3px 0; font-size: 12px; color: #666;">POS System Receipt</p>
+                    <p style="margin: 3px 0; font-size: 11px; color: #666;">
+                        ${receiptData.receipt_number} • ${new Date(receiptData.date).toLocaleString()}
+                    </p>
+                </div>
+
+                <div style="margin: 10px 0; padding: 8px; background: #fffbea; border: 1px solid #f0e6a8; border-radius: 6px; font-size: 13px;">
+                    <div><strong>Customer:</strong> ${receiptData.customer.name}</div>
+                    <div><strong>Phone:</strong> ${receiptData.customer.phone}</div>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <div style="display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 6px; font-weight: 700; font-size: 12px; color: #666; padding: 6px 0;">
+                        <div>ITEM (QTY)</div>
+                        <div style="text-align:center">MARKET PRICE</div>
+                        <div style="text-align:center">OUR PRICE</div>
+                        <div style="text-align:right">TOTAL</div>
+                    </div>
+                    <div style="border-bottom: 1px dashed #eee; margin: 6px 0;"></div>
+            `;
+            
+            // Add items
+            receiptData.items.forEach(item => {
+                receiptHtml += `
+                    <div style="display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 6px; align-items: center; padding: 6px 0;">
+                        <div style="font-size: 13px;">
+                            ${item.name}
+                            <div style="font-size: 12px; color: #666; margin-top: 4px;">× ${item.quantity}</div>
+                        </div>
+                        <div style="color: #8a8f98; font-size: 12px; text-decoration: line-through; text-align: center;">
+                            Rs.${parseFloat(item.market_price || item.price).toFixed(2)}
+                        </div>
+                        <div style="color: #2c3e50; font-weight: 700; font-size: 12px; text-align: center;">
+                            Rs.${parseFloat(item.price).toFixed(2)}
+                        </div>
+                        <div style="text-align: right; font-weight: 700; color: #2c3e50;">
+                            Rs.${parseFloat(item.total).toFixed(2)}
+                        </div>
+                    </div>
+                    <div style="text-align: right; color: #28a745; font-size: 12px; margin-top: -6px; margin-bottom: 6px;">
+                        Profit: Rs.${parseFloat(item.total_profit || 0).toFixed(2)}
+                    </div>
+                    <div style="border-bottom: 1px dashed #eee; margin: 6px 0;"></div>
+                `;
+            });
+            
+            // Add totals
+            receiptHtml += `
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px dashed #ddd; font-weight: 700;">
+                        <div>Subtotal:</div>
+                        <div>Rs.${parseFloat(receiptData.totals.subtotal).toFixed(2)}</div>
+                    </div>
+                    ${receiptData.totals.discount > 0 ? `
+                    <div style="display: flex; justify-content: space-between; padding-top: 6px; font-weight: 600;">
+                        <div>Discount:</div>
+                        <div>- Rs.${parseFloat(receiptData.totals.discount).toFixed(2)}</div>
+                    </div>
+                    ` : ''}
+                    <div style="display: flex; justify-content: space-between; padding-top: 8px; font-size: 15px; border-top: 1px solid #ddd;">
+                        <div>GRAND TOTAL:</div>
+                        <div>Rs.${parseFloat(receiptData.totals.total).toFixed(2)}</div>
+                    </div>
+                </div>
+
+                <div style="font-weight: 700; font-size: 15px; color: #28a745; text-align: center; margin: 15px 0; background-color: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid rgba(40,167,69,0.15);">
+                    YOUR TOTAL PROFIT = Rs.${parseFloat(receiptData.totals.total_profit || 0).toFixed(2)}
+                </div>
+
+                <div style="margin-top: 10px; font-size: 13px; background: #f8f9fa; padding: 12px; border-radius: 6px;">
+                    <div style="margin: 4px 0;"><strong>Payment Method:</strong> ${receiptData.payment.method.toUpperCase()}</div>
+            `;
+            
+            // Add payment method specific information
+            if (receiptData.payment.method === 'cash') {
+                receiptHtml += `
+                    <div style="margin: 4px 0;">Cash Received: Rs.${parseFloat(receiptData.payment.cash_received).toFixed(2)}</div>
+                    <div style="margin: 4px 0;">Balance: Rs.${parseFloat(receiptData.payment.cash_balance).toFixed(2)}</div>
+                `;
+            } else if (receiptData.payment.method === 'card') {
+                receiptHtml += `
+                    <div style="margin: 4px 0;">Reference: ${receiptData.payment.reference || 'N/A'}</div>
+                    ${receiptData.payment.bank ? `<div style="margin: 4px 0;">Bank: ${receiptData.payment.bank}</div>` : ''}
+                `;
+            } else if (receiptData.payment.method === 'cheque') {
+                receiptHtml += `
+                    <div style="margin: 4px 0;">Cheque No: ${receiptData.payment.cheque_no || 'N/A'}</div>
+                    <div style="margin: 4px 0;">Bank: ${receiptData.payment.bank || 'N/A'}</div>
+                    ${receiptData.payment.remarks ? `<div style="margin: 4px 0;">Remarks: ${receiptData.payment.remarks}</div>` : ''}
+                `;
+            } else if (receiptData.payment.method === 'credit') {
+                receiptHtml += `
+                    <div style="margin: 4px 0;">Previous Balance: Rs.${parseFloat(receiptData.payment.current_balance).toFixed(2)}</div>
+                    <div style="margin: 4px 0; font-weight: 700; color: #e74c3c;">New Balance: Rs.${parseFloat(receiptData.payment.new_balance).toFixed(2)}</div>
+                `;
+            }
+            
+            receiptHtml += `
+                </div>
+
+                <div style="text-align: center; margin-top: 15px; font-weight: 700; color: #2c3e50;">
+                    Thank you for your business!
+                </div>
+            `;
+            
+            body.innerHTML = receiptHtml;
+            
+            // Update footer buttons for receipt
+            footer.innerHTML = `
+                <button class="popup-btn cancel" onclick="closePaymentPopupAndRefresh()">Close</button>
+                <button class="popup-btn confirm" onclick="printStyledReceipt(receiptData)"><i class="fas fa-print"></i> Print Again</button>
+            `;
+            
+            // Store receipt data for printing
+            window.currentReceiptData = receiptData;
+        }
+
+        function closePaymentPopupAndRefresh() {
+            closePaymentPopup();
+            location.reload();
+        }
+
+        // New function to print in the styled format
+        function printStyledReceipt(receiptData) {
+            const receiptDataToUse = receiptData || window.currentReceiptData;
+            
+            if (!receiptDataToUse) {
+                alert('No receipt data available');
+                return;
+            }
+
+            const receiptContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Receipt - ${receiptDataToUse.receipt_number}</title>
+                    <meta name="viewport" content="width=device-width,initial-scale=1">
+                    <style>
+                        :root { --muted: #666; --accent: #2c3e50; --success: #28a745; --paper: #fff; --bg: #f8f9fa; }
+                        body { 
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace; 
+                            margin: 0; 
+                            padding: 12px; 
+                            font-size: 13px;
+                            max-width: 420px;
+                            color: var(--accent);
+                            background: white;
+                        }
+                        .header { 
+                            text-align: center; 
+                            margin-bottom: 10px;
+                            border-bottom: 1px dashed #ddd;
+                            padding-bottom: 8px;
+                        }
+                        .company-name { 
+                            font-weight: 700; 
+                            font-size: 18px;
+                            margin-bottom: 3px;
+                        }
+                        .receipt-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+                        .customer-block {
+                            margin: 10px 0;
+                            padding: 8px;
+                            background: #fffbea;
+                            border: 1px solid #f0e6a8;
+                            border-radius: 6px;
+                            font-size: 13px;
+                        }
+                        .customer-block div { margin: 2px 0; }
+                        .items-section {
+                            margin-top: 8px;
+                        }
+                        .item-header {
+                            display: grid;
+                            grid-template-columns: 3fr 1fr 1fr 1fr;
+                            gap: 6px;
+                            font-weight: 700;
+                            font-size: 12px;
+                            color: var(--muted);
+                            padding: 6px 0;
+                        }
+                        .line { border-bottom: 1px dashed #eee; margin: 6px 0; }
+                        .item-row {
+                            display: grid;
+                            grid-template-columns: 3fr 1fr 1fr 1fr;
+                            gap: 6px;
+                            align-items: center;
+                            padding: 6px 0;
+                        }
+                        .item-name { 
+                            font-size: 13px;
+                        }
+                        .price-details { font-size: 12px; color: var(--muted); margin-top: 4px; }
+                        .market-price-value { 
+                            color: #8a8f98; 
+                            font-size: 12px; 
+                            text-decoration: line-through;
+                            text-align: center;
+                        }
+                        .our-price-value { 
+                            color: var(--accent); 
+                            font-weight: 700; 
+                            font-size: 12px;
+                            text-align: center;
+                        }
+                        .total-price { 
+                            text-align: right; 
+                            font-weight: 700; 
+                            color: var(--accent);
+                        }
+                        .line-profit { margin-top: -6px; margin-bottom: 6px; }
+                        .totals-section { margin-top: 8px; }
+                        .item-row.total-line { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            padding-top: 8px; 
+                            border-top: 1px dashed #ddd; 
+                            font-weight: 700; 
+                        }
+                        .small-muted { font-size: 12px; color: var(--muted); }
+                        .profit-total {
+                            font-weight: 700;
+                            font-size: 15px;
+                            color: var(--success);
+                            text-align: center;
+                            margin: 10px 0;
+                            background-color: var(--bg);
+                            padding: 8px;
+                            border-radius: 6px;
+                            border: 1px solid rgba(40,167,69,0.15);
+                        }
+                        .payment-info { 
+                            margin-top: 8px; 
+                            font-size: 13px; 
+                            background: #f8f9fa;
+                            padding: 10px;
+                            border-radius: 6px;
+                        }
+                        .payment-info div { margin: 4px 0; }
+                        .thank-you { 
+                            text-align: center; 
+                            margin-top: 10px; 
+                            font-weight: 700; 
+                            color: var(--accent);
+                        }
+                        .no-print { margin-top: 12px; text-align: center; }
+                        button { 
+                            padding: 8px 14px; 
+                            border-radius: 6px; 
+                            border: none; 
+                            cursor: pointer; 
+                            font-weight: 600;
+                            transition: all 0.3s ease;
+                        }
+                        .btn-print { 
+                            background: var(--accent); 
+                            color: #fff; 
+                            margin-right: 6px; 
+                        }
+                        .btn-print:hover { background: #1a252f; }
+                        .btn-close { 
+                            background: #e74c3c; 
+                            color: #fff; 
+                        }
+                        .btn-close:hover { background: #c0392b; }
+                        @media print {
+                            body { margin: 0; padding: 6px; max-width: 320px; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="company-name">LUXURY STORE</div>
+                        <div class="small-muted">POS System Receipt</div>
+                        <div class="receipt-meta">${receiptDataToUse.receipt_number} • ${new Date(receiptDataToUse.date).toLocaleString()}</div>
+                    </div>
+
+                    <div class="customer-block">
+                        <div><strong>Customer:</strong> ${receiptDataToUse.customer.name}</div>
+                        <div><strong>Phone:</strong> ${receiptDataToUse.customer.phone}</div>
+                    </div>
+
+                    <div class="items-section">
+                        <div class="item-header">
+                            <div>ITEM (QTY)</div>
+                            <div style="text-align:center">MARKET PRICE</div>
+                            <div style="text-align:center">OUR PRICE</div>
+                            <div style="text-align:right">TOTAL</div>
+                        </div>
+
+                        <div class="line"></div>
+
+                        ${receiptDataToUse.items.map(item => `
+                            <div class="item-row">
+                                <div class="item-name">
+                                    ${item.name}
+                                    <div class="price-details">× ${item.quantity}</div>
+                                </div>
+                                <div class="market-price market-price-value">
+                                    Rs.${parseFloat(item.market_price || item.price).toFixed(2)}
+                                </div>
+                                <div class="our-price our-price-value">
+                                    Rs.${parseFloat(item.price).toFixed(2)}
+                                </div>
+                                <div class="total-price our-price-value">
+                                    Rs.${parseFloat(item.total).toFixed(2)}
+                                </div>
+                            </div>
+                            <div class="price-details line-profit" style="text-align: right; color: #28a745; font-size: 12px;">
+                                Profit: Rs.${parseFloat(item.total_profit || 0).toFixed(2)}
+                            </div>
+                            <div class="line"></div>
+                        `).join('')}
+
+                    </div>
+
+                    <div class="totals-section">
+                        <div class="item-row total-line">
+                            <div>Subtotal:</div>
+                            <div></div>
+                            <div></div>
+                            <div>Rs.${parseFloat(receiptDataToUse.totals.subtotal).toFixed(2)}</div>
+                        </div>
+                        ${receiptDataToUse.totals.discount > 0 ? `
+                        <div class="item-row total-line" style="font-weight:600;">
+                            <div>Discount:</div>
+                            <div></div>
+                            <div></div>
+                            <div>- Rs.${parseFloat(receiptDataToUse.totals.discount).toFixed(2)}</div>
+                        </div>
+                        ` : ''}
+                        <div class="item-row total-line" style="font-size:15px;">
+                            <div>GRAND TOTAL:</div>
+                            <div></div>
+                            <div></div>
+                            <div>Rs.${parseFloat(receiptDataToUse.totals.total).toFixed(2)}</div>
+                        </div>
+                    </div>
+
+                    <div class="profit-total">
+                        YOUR TOTAL PROFIT = Rs.${parseFloat(receiptDataToUse.totals.total_profit || 0).toFixed(2)}
+                    </div>
+
+                    <div class="payment-info">
+                        <div><strong>Payment Method:</strong> ${receiptDataToUse.payment.method.toUpperCase()}</div>
+                        ${receiptDataToUse.payment.method === 'cash' ? `
+                            <div>Cash Received: Rs.${parseFloat(receiptDataToUse.payment.cash_received).toFixed(2)}</div>
+                            <div>Balance: Rs.${parseFloat(receiptDataToUse.payment.cash_balance).toFixed(2)}</div>
+                        ` : ''}
+                        ${receiptDataToUse.payment.method === 'card' ? `
+                            <div>Reference: ${receiptDataToUse.payment.reference || 'N/A'}</div>
+                            ${receiptDataToUse.payment.bank ? `<div>Bank: ${receiptDataToUse.payment.bank}</div>` : ''}
+                        ` : ''}
+                        ${receiptDataToUse.payment.method === 'cheque' ? `
+                            <div>Cheque No: ${receiptDataToUse.payment.cheque_no || 'N/A'}</div>
+                            <div>Bank: ${receiptDataToUse.payment.bank || 'N/A'}</div>
+                            ${receiptDataToUse.payment.remarks ? `<div>Remarks: ${receiptDataToUse.payment.remarks}</div>` : ''}
+                        ` : ''}
+                        ${receiptDataToUse.payment.method === 'credit' ? `
+                            <div>Previous Balance: Rs.${parseFloat(receiptDataToUse.payment.current_balance).toFixed(2)}</div>
+                            <div>New Balance: Rs.${parseFloat(receiptDataToUse.payment.new_balance).toFixed(2)}</div>
+                        ` : ''}
+                    </div>
+
+                    <div class="thank-you">
+                        Thank you for your business!
+                    </div>
+
+                    <div class="no-print">
+                        <button class="btn-print" onclick="window.print()">🖨️ Print Receipt</button>
+                        <button class="btn-close" onclick="window.close()">❌ Close</button>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes');
+            printWindow.document.write(receiptContent);
+            printWindow.document.close();
+            
+            // Auto-print after a short delay
+            setTimeout(() => {
+                try { 
+                    printWindow.print(); 
+                } catch (e) { 
+                    console.log('Print may be blocked by browser:', e);
+                }
+            }, 500);
+        }
+
         document.getElementById('status-filter').addEventListener('change', loadDraftBills);
         document.getElementById('date-filter').addEventListener('change', loadDraftBills);
 
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('date-filter').setAttribute('max', today);
+            // Set default filter to draft
+            document.getElementById('status-filter').value = 'draft';
             loadDraftBills();
         });
 
         document.getElementById('refresh-btn').addEventListener('click', function() {
             const btn = this;
             btn.classList.add('refreshing');
-            document.getElementById('status-filter').value = '';
+            document.getElementById('status-filter').value = 'draft'; // Reset to draft
             document.getElementById('date-filter').value = '';
             loadDraftBills().then(() => {
                 setTimeout(() => btn.classList.remove('refreshing'), 700);
