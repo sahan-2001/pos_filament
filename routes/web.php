@@ -136,3 +136,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pos', [POSController::class, 'index'])->name('pos.index');
 });
 Route::view('/draft-bills', 'pos.draft-bills');
+Route::view('/orders', 'pos.orders');

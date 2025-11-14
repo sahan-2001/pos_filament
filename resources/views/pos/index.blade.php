@@ -876,7 +876,7 @@
                 
                 <div class="flex flex-wrap gap-2 mt-2">
                     <a href="/pos" class="btn-nav">New Bill</a>
-                    <a href="/bills" class="btn-nav">List of Bills</a>
+                    <a href="/orders" class="btn-nav">List of Bills</a>
                     <a href="/draft-bills" class="btn-nav">Draft Bills</a>
                     <a href="/credit-bills" class="btn-nav">Credit Bills</a>
                     <a href="/admin" class="btn-nav back-dashboard">← Back to Dashboard</a>
