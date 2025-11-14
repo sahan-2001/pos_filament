@@ -28,6 +28,7 @@ Route::get('/orders/{id}/receipt', [OrderApiController::class, 'getReceipt']);
 Route::post('/draft-invoices', [DraftBillApiController::class, 'store']);
 Route::get('/draft-invoices', [DraftBillApiController::class, 'index']);
 Route::get('/draft-invoices/{id}', [DraftBillApiController::class, 'show']);
+Route::delete('/draft-invoices/{id}', [DraftBillApiController::class, 'destroy']);
 Route::post('/draft-invoices/{id}/pay', [DraftBillApiController::class, 'processPayment']);
 Route::get('/draft-invoices/{id}/receipt', [DraftBillApiController::class, 'getReceipt']);
 

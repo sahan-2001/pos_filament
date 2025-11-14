@@ -218,6 +218,33 @@
             border-radius: 5px;
             margin-bottom: 15px;
         }
+
+        .delete-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .delete-warning i {
+            color: #f39c12;
+            margin-right: 8px;
+        }
+
+        .delete-bill-info {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .delete-bill-info div {
+            margin: 4px 0;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -266,9 +293,35 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Popup -->
+    <div id="delete-confirm-popup" class="popup-container" style="display: none;">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Confirm Deletion</h3>
+                <button class="popup-close" onclick="closeDeleteConfirmPopup()">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div style="text-align: center; padding: 20px 0;">
+                    <i class="fas fa-trash-alt" style="font-size: 48px; color: #e74c3c; margin-bottom: 15px;"></i>
+                    <h4 style="margin: 10px 0; color: #2c3e50;">Delete Draft Bill?</h4>
+                    <p style="color: #666; margin: 0;">Are you sure you want to delete this draft bill? This action cannot be undone and all bill data will be permanently lost.</p>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="popup-btn cancel" onclick="closeDeleteConfirmPopup()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="popup-btn confirm" onclick="confirmDelete()" style="background-color: #e74c3c; border-color: #e74c3c;">
+                    <i class="fas fa-trash"></i> Delete Bill
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentBill = null;
         let currentCustomer = null;
+        let deleteBillId = null;
 
         async function loadDraftBills() {
             const content = document.getElementById('draft-bills-content');
@@ -313,6 +366,7 @@
 
                 bills.forEach(bill => {
                     const canPay = bill.status === 'draft' || bill.status === 'partially_paid';
+                    const canDelete = bill.status === 'draft'; // Only allow deletion of draft bills
                     html += `<tr>
                         <td>${bill.id}</td>
                         <td>${new Date(bill.created_at).toLocaleString()}</td>
@@ -325,6 +379,7 @@
                         <td class="actions">
                             <a onclick="showBillDetails(${bill.id})"><i class="fas fa-eye"></i> View</a>
                             ${canPay ? `<a onclick="showPayPopup(${bill.id}, '${bill.customer_id || ''}', ${bill.total}, ${bill.discount})"><i class="fas fa-money-bill-wave"></i> Pay</a>` : ''}
+                            ${canDelete ? `<a onclick="deleteDraftBill(${bill.id})" style="color: #e74c3c;"><i class="fas fa-trash"></i> Delete</a>` : ''}
                         </td>
                     </tr>`;
                 });
@@ -335,6 +390,53 @@
                 content.innerHTML = `<div class="error">Error loading draft bills.</div>`;
             }
         }
+
+        // Add delete function
+        async function deleteDraftBill(id) {
+            if (!confirm('Are you sure you want to delete this draft bill? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/draft-invoices/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                // Check if response is JSON
+                const contentType = res.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await res.text();
+                    console.error('Non-JSON response from delete:', text.substring(0, 200));
+                    
+                    if (res.status === 401) {
+                        throw new Error('Please log in to delete draft bills');
+                    } else if (res.status === 404) {
+                        throw new Error('Draft bill not found or already deleted');
+                    } else {
+                        throw new Error('Server error. Please try again.');
+                    }
+                }
+
+                const result = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(result.message || 'Failed to delete draft bill');
+                }
+
+                alert('Draft bill deleted successfully!');
+                loadDraftBills(); // Refresh the list
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert(error.message || 'Failed to delete draft bill. Please try again.');
+            }
+        }
+
 
         async function showBillDetails(id) {
             const modal = document.getElementById('bill-modal');

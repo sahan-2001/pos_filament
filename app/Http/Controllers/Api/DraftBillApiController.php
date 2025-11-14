@@ -11,6 +11,8 @@ use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Payment;
+use App\Models\Order;
+use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -180,6 +182,60 @@ class DraftBillApiController extends Controller
         }
     }
 
+    // DELETE /api/draft-invoices/{id} - Delete draft invoice
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $draftInvoice = DraftInvoice::with('items', 'payments')->findOrFail($id);
+            
+            // Check if draft can be deleted (only draft status allowed)
+            if ($draftInvoice->status !== 'draft') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only draft bills can be deleted'
+                ], 422);
+            }
+
+            // Check if there are any payments associated (shouldn't be for drafts, but just in case)
+            if ($draftInvoice->payments && $draftInvoice->payments->count() > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete draft bill with payment records'
+                ], 422);
+            }
+
+            // Delete related items first
+            DraftInvoiceItem::where('draft_invoice_id', $id)->delete();
+            
+            // Delete the draft invoice
+            $draftInvoice->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Draft bill deleted successfully'
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Draft bill not found'
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Draft bill deletion error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete draft bill: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function processPayment(Request $request, $id)
     {
         DB::beginTransaction();
@@ -231,8 +287,8 @@ class DraftBillApiController extends Controller
                 $paymentData['cheque_no'] = $validated['cheque_no'];
             }
 
-            // Create payment record
-            $payment = DraftBillPayment::create($paymentData);
+            // Create draft bill payment record
+            $draftPayment = DraftBillPayment::create($paymentData);
 
             $currentBalance = 0;
             $newBalance = 0;
@@ -248,8 +304,12 @@ class DraftBillApiController extends Controller
                 }
             }
 
-            // after creating DraftBillPayment
+            // CREATE ORDER AND ORDER ITEMS FROM DRAFT INVOICE
+            $order = $this->convertDraftToOrder($draftInvoice, $validated, $userId);
+
+            // Create payment record in payments table with order reference
             $paymentRecord = Payment::create([
+                'order_id' => $order->id, // Link to order
                 'draft_bill_id' => $draftInvoice->id,
                 'payment_method' => $validated['method'],
                 'amount' => $validated['amount'],
@@ -265,14 +325,16 @@ class DraftBillApiController extends Controller
                 'updated_by' => $userId,
             ]);
 
-            // Update draft invoice status
-            $draftInvoice->status = 'paid';
-            $draftInvoice->save();
+            // Update draft invoice status and link to order
+            $draftInvoice->update([
+                'status' => 'paid',
+                'order_id' => $order->id // Link draft to order
+            ]);
 
             DB::commit();
 
             // Generate receipt data with credit balance information
-            $receiptData = $this->generateReceiptData($draftInvoice, $payment, null, [
+            $receiptData = $this->generateReceiptData($draftInvoice, $draftPayment, $order, [
                 'current_balance' => $currentBalance,
                 'new_balance' => $newBalance
             ]);
@@ -280,7 +342,9 @@ class DraftBillApiController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Payment processed successfully',
-                'payment_id' => $payment->id,
+                'payment_id' => $draftPayment->id,
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
                 'receipt_data' => $receiptData
             ]);
 
@@ -323,47 +387,44 @@ class DraftBillApiController extends Controller
         ]);
     }
 
-    private function convertDraftToSale($draftInvoice, $payment)
+    private function convertDraftToOrder($draftInvoice, $paymentData, $userId)
     {
-        // Optional: Convert draft to permanent sale record
-        // You can modify this based on your business logic
-        
-        $sale = Sale::create([
+        // Create order
+        $order = Order::create([
+            'user_id' => $userId,
             'customer_id' => $draftInvoice->customer_id,
-            'total_amount' => $draftInvoice->total,
+            'subtotal' => $draftInvoice->subtotal,
             'discount' => $draftInvoice->discount,
-            'tax' => 0, // Adjust as needed
-            'grand_total' => $draftInvoice->total,
-            'payment_status' => 'paid',
-            'sale_date' => Carbon::now(),
-            'created_by' => auth()->id() ?? 1,
+            'total' => $draftInvoice->total,
+            'status' => 'completed',
+            'order_date' => Carbon::now(),
+            'created_by' => $userId,
+            'updated_by' => $userId,
         ]);
 
-        // Create sale items
-        foreach ($draftInvoice->items as $item) {
-            SaleItem::create([
-                'sale_id' => $sale->id,
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'unit_price' => $item->selling_price,
-                'total_price' => $item->line_total,
+        // Create order items from draft invoice items
+        foreach ($draftInvoice->items as $draftItem) {
+            $inventoryItem = InventoryItem::find($draftItem->product_id);
+            
+            OrderItem::create([
+                'order_id' => $order->id,
+                'product_id' => $draftItem->product_id,
+                'quantity' => $draftItem->quantity,
+                'unit_price' => $draftItem->selling_price,
+                'original_price' => $draftItem->selling_price,
+                'line_total' => $draftItem->line_total,
+                'regular_market_price' => $inventoryItem ? $inventoryItem->market_price : $draftItem->selling_price,
+                'regular_selling_price' => $inventoryItem ? $inventoryItem->selling_price : $draftItem->selling_price,
+                'cost' => $draftItem->cost_price,
+                'created_by' => $userId,
+                'updated_by' => $userId,
             ]);
         }
 
-        // Create payment record in payments table
-        Payment::create([
-            'sale_id' => $sale->id,
-            'amount' => $payment->pay_amount,
-            'payment_method' => $payment->payment_type,
-            'payment_date' => Carbon::now(),
-            'reference' => $payment->reference,
-            'status' => 'completed',
-        ]);
-
-        return $sale;
+        return $order;
     }
 
-    private function generateReceiptData($draftInvoice, $payment, $sale = null, $creditData = [])
+    private function generateReceiptData($draftInvoice, $payment, $order = null, $creditData = [])
     {
         // Calculate profit for each item
         $itemsWithProfit = $draftInvoice->items->map(function($item) {
@@ -379,7 +440,7 @@ class DraftBillApiController extends Controller
                 'quantity' => $quantity,
                 'price' => $sellingPrice,
                 'total' => $lineTotal,
-                'market_price' => $item->inventoryItem->market_price ?? $sellingPrice, // Use market price if available
+                'market_price' => $item->inventoryItem->market_price ?? $sellingPrice,
                 'cost_price' => $costPrice,
                 'profit_per_item' => $profitPerItem,
                 'total_profit' => $totalProfit
@@ -392,7 +453,8 @@ class DraftBillApiController extends Controller
         return [
             'receipt_number' => 'RCPT-' . str_pad($payment->id, 6, '0', STR_PAD_LEFT),
             'invoice_number' => 'DRAFT-' . $draftInvoice->id,
-            'sale_number' => $sale ? 'SALE-' . $sale->id : null,
+            'order_number' => $order ? $order->order_number : null,
+            'order_id' => $order ? $order->id : null,
             'date' => Carbon::now()->format('Y-m-d H:i:s'),
             'customer' => [
                 'id' => $draftInvoice->customer_id,

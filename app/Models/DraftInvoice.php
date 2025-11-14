@@ -34,6 +34,11 @@ class DraftInvoice extends Model
             return $this->hasMany(DraftBillPayment::class);
         }
 
+        public function order()
+        {
+            return $this->belongsTo(Order::class, 'order_id');
+        }
+
         protected static function booted()
         {
             static::creating(function ($model) {
