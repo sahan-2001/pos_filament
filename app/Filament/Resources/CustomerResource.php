@@ -21,31 +21,112 @@ class CustomerResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('shop_name')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('address')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('email')
-                    ->required()
-                    ->email()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('phone_1')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('phone_2')
-                    ->maxLength(255),
+
+                Forms\Components\Section::make('Basic Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('shop_name')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('address')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('email')
+                            ->required()
+                            ->email()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('phone_1')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('phone_2')
+                            ->maxLength(255),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Shipping Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('shipping_address_line_1')
+                            ->label('Address Line 1')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('shipping_address_line_2')
+                            ->label('Address Line 2')
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('shipping_city')
+                            ->label('City')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('shipping_state')
+                            ->label('State')
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('shipping_zip_code')
+                            ->label('ZIP Code')
+                            ->required()
+                            ->maxLength(50),
+                        Forms\Components\Select::make('shipping_country')
+                            ->label('Country')
+                            ->options(\App\Helpers\Countries::all())
+                            ->searchable()
+                            ->default('Sri Lanka')
+                            ->native(false),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Billing Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('billing_address_line_1')
+                            ->label('Address Line 1')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('billing_address_line_2')
+                            ->label('Address Line 2')
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('billing_city')
+                            ->label('City')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('billing_state')
+                            ->label('State')
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('billing_zip_code')
+                            ->label('ZIP Code')
+                            ->required()
+                            ->maxLength(50),
+
+                        Forms\Components\Select::make('billing_country')
+                            ->label('Country')
+                            ->options(\App\Helpers\Countries::all())
+                            ->searchable()
+                            ->default('Sri Lanka')
+                            ->native(false),
+                        ])
+                    ->columns(2),
+
                 Forms\Components\Hidden::make('remaining_balance')
                     ->default(0),
+
                 Forms\Components\Hidden::make('requested_by')
                     ->default(fn () => auth()->user()->id),
+
                 Forms\Components\Hidden::make('approved_by'),
             ]);
     }
+
 
     public static function table(Tables\Table $table): Tables\Table
     {

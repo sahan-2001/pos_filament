@@ -18,7 +18,18 @@ class Customer extends Model
     protected $fillable = [
         'name',
         'shop_name',
-        'address',
+        'shipping_address_line_1',
+        'shipping_address_line_2',
+        'shipping_city',
+        'shipping_zip_code',
+        'shipping_state',
+        'shipping_country',
+        'billing_address_line_1',
+        'billing_address_line_2',
+        'billing_city',
+        'billing_zip_code',
+        'billing_state',
+        'billing_country',
         'email',
         'phone_1',
         'phone_2',
@@ -26,7 +37,7 @@ class Customer extends Model
         'requested_by',
         'approved_by',
         'created_by',
-        'updated_by',
+        'updated_by'
     ];
 
     public function requestedBy()
@@ -42,13 +53,26 @@ class Customer extends Model
     protected static $logAttributes = [
         'name',
         'shop_name',
-        'address',
+        'shipping_address_line_1',
+        'shipping_address_line_2',
+        'shipping_city',
+        'shipping_zip_code',
+        'shipping_state',
+        'shipping_country',
+        'billing_address_line_1',
+        'billing_address_line_2',
+        'billing_city',
+        'billing_zip_code',
+        'billing_state',
+        'billing_country',
         'email',
         'phone_1',
         'phone_2',
         'remaining_balance',
         'requested_by',
         'approved_by',
+        'created_by',
+        'updated_by'
     ];
 
     protected static function booted()
@@ -80,7 +104,18 @@ class Customer extends Model
             ->logOnly([
                 'name',
                 'shop_name',
-                'address',
+                'shipping_address_line_1',
+                'shipping_address_line_2',
+                'shipping_city',
+                'shipping_zip_code',
+                'shipping_state',
+                'shipping_country',
+                'billing_address_line_1',
+                'billing_address_line_2',
+                'billing_city',
+                'billing_zip_code',
+                'billing_state',
+                'billing_country',
                 'email',
                 'phone_1',
                 'phone_2',

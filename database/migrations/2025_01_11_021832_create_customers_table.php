@@ -17,7 +17,23 @@ class CreateCustomersTable extends Migration
             $table->id('customer_id');
             $table->string('name');
             $table->string('shop_name');
-            $table->string('address');
+
+            // Shipping Address
+            $table->string('shipping_address_line_1');
+            $table->string('shipping_address_line_2')->nullable();
+            $table->string('shipping_city');
+            $table->string('shipping_zip_code');
+            $table->string('shipping_state')->nullable();
+            $table->string('shipping_country');
+
+            // Billing Address
+            $table->string('billing_address_line_1');
+            $table->string('billing_address_line_2')->nullable();
+            $table->string('billing_city');
+            $table->string('billing_zip_code');
+            $table->string('billing_state')->nullable();
+            $table->string('billing_country');
+
             $table->string('email');
             $table->string('phone_1');
             $table->string('phone_2')->nullable();
