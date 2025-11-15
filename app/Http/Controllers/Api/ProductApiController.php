@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -106,7 +107,7 @@ class ProductApiController extends Controller
     public function getCompanyInfo()
     {
         try {
-            // Get the first company record (adjust as needed for your business logic)
+            // Get the first company record
             $company = Company::first();
             
             if (!$company) {
@@ -129,16 +130,34 @@ class ProductApiController extends Controller
                     'primary_phone' => $company->primary_phone,
                     'secondary_phone' => $company->secondary_phone,
                     'email' => $company->email,
-                    'logo' => $company->logo ? asset('storage/' . $company->logo) : null,
-                    'formatted_address' => $company->getFormattedAddress(),
+                    'logo' => $company->logo_url, // Use the accessor
+                    'formatted_address' => $company->formatted_address, // Use the accessor
                     'special_notes' => $company->special_notes,
                 ]
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error fetching company info: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch company information'
             ], 500);
         }
+    }
+
+    /**
+     * Format company address
+     */
+    private function getFormattedAddress($company)
+    {
+        $addressParts = [
+            $company->address_line_1,
+            $company->address_line_2,
+            $company->address_line_3,
+            $company->city,
+            $company->postal_code,
+            $company->country
+        ];
+
+        return implode(', ', array_filter($addressParts));
     }
 }

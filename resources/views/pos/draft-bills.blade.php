@@ -2,13 +2,89 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Draft Bills - Luxury POS System</title>
+    <title>Draft Bills - POS</title>
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
         body { font-family: 'Montserrat', sans-serif; background: #f5f5f5; margin: 0; }
-        .container { max-width: 1200px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(44,62,80,0.07); padding: 30px; }
+        .container { max-width: 1300px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(44,62,80,0.07); padding: 30px; }
+        
+        /* Header with company info */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .company-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2c3e50, #b38b6d);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .company-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+        
+        .company-logo.has-image {
+            background: transparent;
+            border: 1px solid rgba(12, 20, 30, 0.1);
+        }
+        
+        .company-logo.no-image {
+            background: linear-gradient(135deg, #2c3e50, #b38b6d);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .company-info {
+            line-height: 1.4;
+        }
+        
+        .company-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .company-details {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0 0 0;
+        }
+        
+        .page-title {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 28px;
+        }
+        
         h2 { color: #2c3e50; margin-bottom: 20px; }
         .filter-bar {
             display: flex;
@@ -245,12 +321,71 @@
             margin: 4px 0;
             font-size: 14px;
         }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            .header-left {
+                flex-direction: column;
+                align-items: flex-start;
+                text-align: left;
+            }
+            
+            .company-logo {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .company-logo.no-image {
+                font-size: 16px;
+            }
+            
+            .company-name {
+                font-size: 20px;
+            }
+            
+            .page-title {
+                font-size: 24px;
+            }
+            
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            .filter-bar > div {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="/pos" class="back-btn"><i class="fas fa-arrow-left"></i> Back to POS</a>
-        <h2><i class="fas fa-file-alt"></i> Draft Bills</h2>
+        <!-- Updated Header with Company Info -->
+        <div class="page-header">
+            <div class="header-left">
+                <div class="company-logo" id="company-logo">
+                    LS
+                </div>
+                <div class="company-info">
+                    <h1 class="company-name" id="company-name">Luxury POS System</h1>
+                    <p class="company-details" id="company-details">Loading company information...</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <h2 class="page-title"><i class="fas fa-file-alt"></i> Draft Bills</h2>
+                <a href="/pos" class="back-btn"><i class="fas fa-arrow-left"></i> Back to POS</a>
+            </div>
+        </div>
+
         <div class="filter-bar">
             <label for="status-filter">Status:</label>
             <select id="status-filter">
@@ -322,7 +457,98 @@
         let currentBill = null;
         let currentCustomer = null;
         let deleteBillId = null;
+        let companyInfo = null;
 
+        // ========== Company Data Management ==========
+        async function fetchCompanyInfo() {
+            try {
+                const response = await fetch('/api/company/info');
+                const result = await response.json();
+                
+                if (result.success && result.company) {
+                    companyInfo = result.company;
+                    console.log('Company info loaded:', companyInfo);
+                    
+                    // Update page with company information
+                    updatePageWithCompanyInfo(companyInfo);
+                } else {
+                    console.warn('Company info not available, using defaults');
+                    // Fallback to default company info
+                    companyInfo = {
+                        name: 'LUXURY STORE',
+                        primary_phone: '',
+                        formatted_address: '',
+                        email: 'info@luxurystore.com'
+                    };
+                    updatePageWithCompanyInfo(companyInfo);
+                }
+            } catch (error) {
+                console.error('Error fetching company info:', error);
+                // Fallback to default company info
+                companyInfo = {
+                    name: 'LUXURY STORE',
+                    primary_phone: '',
+                    formatted_address: '',
+                    email: 'info@luxurystore.com'
+                };
+                updatePageWithCompanyInfo(companyInfo);
+            }
+        }
+
+        // Update page with company information
+        function updatePageWithCompanyInfo(company) {
+            // Update company name
+            const companyNameElement = document.getElementById('company-name');
+            if (companyNameElement && company.name) {
+                companyNameElement.textContent = company.name;
+            }
+            
+            // Update company details
+            const companyDetailsElement = document.getElementById('company-details');
+            if (companyDetailsElement) {
+                let details = [];
+                if (company.email) details.push(company.email);
+                if (company.primary_phone) details.push(company.primary_phone);
+                if (company.formatted_address) details.push(company.formatted_address);
+                
+                companyDetailsElement.textContent = details.join(' | ') || 'POS System';
+            }
+            
+            // Update logo
+            const logoElement = document.getElementById('company-logo');
+            if (logoElement) {
+                if (company.logo) {
+                    const img = document.createElement('img');
+                    img.src = company.logo;
+                    img.alt = company.name;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '6px';
+                    
+                    img.onerror = function() {
+                        console.warn('Company logo failed to load:', company.logo);
+                        fallbackToTextLogo(logoElement, company.name);
+                    };
+                    
+                    logoElement.innerHTML = '';
+                    logoElement.appendChild(img);
+                    logoElement.classList.add('has-image');
+                    logoElement.classList.remove('no-image');
+                } else {
+                    fallbackToTextLogo(logoElement, company.name);
+                }
+            }
+        }
+
+        // Fallback to text-based logo
+        function fallbackToTextLogo(logoElement, companyName) {
+            logoElement.innerHTML = '';
+            logoElement.textContent = companyName ? companyName.substring(0, 2).toUpperCase() : 'LS';
+            logoElement.classList.add('no-image');
+            logoElement.classList.remove('has-image');
+        }
+        
         async function loadDraftBills() {
             const content = document.getElementById('draft-bills-content');
             const status = document.getElementById('status-filter').value;
@@ -743,7 +969,7 @@
             // Build receipt HTML in the same style as your print function
             let receiptHtml = `
                 <div style="text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #ddd; padding-bottom: 10px;">
-                    <h3 style="margin: 0; color: #2c3e50;">LUXURY STORE</h3>
+                    <h3 style="margin: 0; color: #2c3e50;">${companyInfo?.name || 'LUXURY STORE'}</h3>
                     <p style="margin: 3px 0; font-size: 12px; color: #666;">POS System Receipt</p>
                     <p style="margin: 3px 0; font-size: 11px; color: #666;">
                         ${receiptData.receipt_number} • ${new Date(receiptData.date).toLocaleString()}
@@ -1019,7 +1245,7 @@
                 </head>
                 <body>
                     <div class="header">
-                        <div class="company-name">LUXURY STORE</div>
+                        <div class="company-name">${companyInfo?.name || 'LUXURY STORE'}</div>
                         <div class="small-muted">POS System Receipt</div>
                         <div class="receipt-meta">${receiptDataToUse.receipt_number} • ${new Date(receiptDataToUse.date).toLocaleString()}</div>
                     </div>
@@ -1141,6 +1367,7 @@
         document.getElementById('date-filter').addEventListener('change', loadDraftBills);
 
         document.addEventListener('DOMContentLoaded', function() {
+            fetchCompanyInfo();
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('date-filter').setAttribute('max', today);
             // Set default filter to draft

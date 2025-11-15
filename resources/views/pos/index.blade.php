@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Luxury POS System</title>
+    <title>POS - Index</title>
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -681,6 +681,111 @@
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
 
+        .logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), #4cc9f0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .logo.has-image {
+            background: transparent;
+            border: 1px solid rgba(12, 20, 30, 0.1);
+        }
+
+        .logo.no-image {
+            background: linear-gradient(135deg, var(--accent), #4cc9f0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .draft-bill-popup {
+            max-width: 600px;
+            width: 95%;
+        }
+
+        .draft-bill-summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid var(--accent);
+        }
+
+        .draft-bill-items {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+
+        .draft-bill-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .draft-bill-item:last-child {
+            border-bottom: none;
+        }
+
+        .draft-bill-totals {
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #e9ecef;
+        }
+
+        .draft-bill-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .logo {
+                width: 35px;
+                height: 35px;
+            }
+            
+            .logo.no-image {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .store-info .name {
+                max-width: 150px;
+                font-size: 14px;
+            }
+            
+            .store-info .meta {
+                font-size: 11px;
+            }
+        }
+
         /* Responsive */
         @media (max-width: 1100px) {
             .app {
@@ -723,10 +828,15 @@
     <div class="topbar">
         <div class="brand">
             @auth
-            <div class="logo">POS</div>
+            <div class="logo" id="company-logo">
+                POS
+            </div>
             <div class="store-info">
-                <div class="name">Luxury POS System</div>
-                <div class="meta">User ID: {{ $user->id }}</div>
+                <div class="name" id="company-name">Luxury POS System</div>
+                <div class="meta">
+                    <span id="company-email">Loading company info...</span> | 
+                    User ID: {{ $user->id }}
+                </div>
             </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -892,6 +1002,71 @@
         </div>
     </div>
 
+    <!-- Draft Bill Success Popup -->
+<div id="draft-bill-popup" class="popup-container" style="display: none;">
+    <div class="popup-content draft-bill-popup">
+        <div class="popup-header">
+            <h3><i class="fas fa-check-circle"></i> Draft Bill Saved Successfully</h3>
+            <button class="popup-close" onclick="closeDraftBillPopup()">&times;</button>
+        </div>
+        <div class="popup-body">
+            <div class="draft-bill-summary">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: var(--primary-color);" id="draft-bill-number">Draft Bill #</h4>
+                    <span style="font-size: 12px; color: var(--muted);" id="draft-bill-date"></span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                    <div><strong>Customer:</strong> <span id="draft-bill-customer">N/A</span></div>
+                    <div><strong>Items Count:</strong> <span id="draft-bill-items-count">0</span></div>
+                    <div><strong>Subtotal:</strong> Rs.<span id="draft-bill-subtotal">0.00</span></div>
+                    <div><strong>Discount:</strong> Rs.<span id="draft-bill-discount">0.00</span></div>
+                    <div style="grid-column: 1 / -1; border-top: 1px solid #ddd; padding-top: 8px; margin-top: 5px;">
+                        <strong>Total:</strong> Rs.<span id="draft-bill-total" style="font-size: 16px; color: var(--accent);">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="draft-bill-items">
+                <h5 style="margin-bottom: 10px; color: var(--primary-color);">Items in Draft Bill:</h5>
+                <div id="draft-bill-items-list">
+                    <!-- Items will be populated here -->
+                </div>
+            </div>
+
+            <div class="draft-bill-totals">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <strong>Bill Summary</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>Subtotal:</span>
+                    <span>Rs.<span id="draft-summary-subtotal">0.00</span></span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>Discount:</span>
+                    <span>- Rs.<span id="draft-summary-discount">0.00</span></span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 1px solid #ddd; padding-top: 8px;">
+                    <span>GRAND TOTAL:</span>
+                    <span style="color: var(--accent);">Rs.<span id="draft-summary-total">0.00</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="popup-footer">
+            <div class="draft-bill-actions">
+                <button class="popup-btn cancel" onclick="closeDraftBillPopup()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+                <button class="popup-btn confirm" onclick="viewAllDraftBills()" style="background-color: var(--accent);">
+                    <i class="fas fa-list"></i> View All Drafts
+                </button>
+                <button class="popup-btn confirm" onclick="printDraftBill()" style="background-color: var(--success);">
+                    <i class="fas fa-print"></i> Print Draft
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- Payment Popup -->
     <div id="payment-popup" class="popup-container" style="display: none;">
         <div class="popup-content">
@@ -995,14 +1170,19 @@
                 if (result.success && result.company) {
                     companyInfo = result.company;
                     console.log('Company info loaded:', companyInfo);
+                    
+                    // Update topbar with company information
+                    updateTopbarWithCompanyInfo(companyInfo);
                 } else {
                     console.warn('Company info not available, using defaults');
+                    // Fallback to default company info
                     companyInfo = {
                         name: 'LUXURY STORE',
                         primary_phone: '',
                         formatted_address: '',
-                        email: ''
+                        email: 'info@luxurystore.com'
                     };
+                    updateTopbarWithCompanyInfo(companyInfo);
                 }
             } catch (error) {
                 console.error('Error fetching company info:', error);
@@ -1011,9 +1191,61 @@
                     name: 'LUXURY STORE',
                     primary_phone: '',
                     formatted_address: '',
-                    email: ''
+                    email: 'info@luxurystore.com'
                 };
+                updateTopbarWithCompanyInfo(companyInfo);
             }
+        }
+
+        // Update topbar with company information
+        function updateTopbarWithCompanyInfo(company) {
+            // Update company name
+            const companyNameElement = document.getElementById('company-name');
+            if (companyNameElement && company.name) {
+                companyNameElement.textContent = company.name;
+            }
+            
+            const companyEmailElement = document.getElementById('company-email');
+            if (companyEmailElement) {
+                if (company.email) {
+                    companyEmailElement.textContent = company.email;
+                } else {
+                    companyEmailElement.textContent = 'No email configured';
+                }
+            }
+            
+            const logoElement = document.getElementById('company-logo');
+            if (logoElement) {
+                if (company.logo) {
+                    const img = document.createElement('img');
+                    img.src = company.logo;
+                    img.alt = company.name;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '6px';
+                    
+                    img.onerror = function() {
+                        console.warn('Company logo failed to load:', company.logo);
+                        fallbackToTextLogo(logoElement, company.name);
+                    };
+                    
+                    logoElement.innerHTML = '';
+                    logoElement.appendChild(img);
+                    logoElement.classList.add('has-image');
+                    logoElement.classList.remove('no-image');
+                } else {
+                    fallbackToTextLogo(logoElement, company.name);
+                }
+            }
+        }
+
+        // Fallback to text-based logo
+        function fallbackToTextLogo(logoElement, companyName) {
+            logoElement.innerHTML = '';
+            logoElement.textContent = companyName ? companyName.substring(0, 2).toUpperCase() : 'LS';
+            logoElement.classList.add('no-image');
+            logoElement.classList.remove('has-image');
         }
 
         
@@ -1148,7 +1380,7 @@
             await fetchCustomers();
             await fetchCategories(); 
             await loadProducts(); 
-            await fetchCompanyInfo();
+            await fetchCompanyInfo(); 
 
             // Setup event listeners
             setupEventListeners();
@@ -2038,19 +2270,27 @@
 
         // Print Receipt function
         function printReceipt(result, savedCart = [], discount = 0, paymentData = {}) {
+            console.log('🧾 Starting receipt generation...');
+            console.log('Company info available:', companyInfo);
+            
             const order = result || {};
             const orderId = order.order_id || order.id || `TEMP-${Date.now()}`;
             const orderNumber = order.order_number || `ORD${new Date().getTime()}`;
 
-            // Use company info or fallback to defaults
+            // Use company info with better fallbacks
             const companyName = companyInfo?.name || 'LUXURY STORE';
-            const companyPhone = companyInfo?.primary_phone || '';
-            const companyAddress = companyInfo?.formatted_address || '';
+            const companyPhone = companyInfo?.primary_phone || companyInfo?.phone || '';
+            const companyAddress = companyInfo?.formatted_address || 
+                                formatCompanyAddress(companyInfo) || 
+                                'Address not configured';
             const companyEmail = companyInfo?.email || '';
+
+            console.log('Receipt will use company:', { companyName, companyPhone, companyAddress, companyEmail });
 
             // Helper to safely get numeric fields with fallbacks
             const getNumber = (v, fallback = 0) => {
-                const n = typeof v === 'number' ? v : (v ? parseFloat(v) : NaN);
+                if (v === null || v === undefined) return fallback;
+                const n = typeof v === 'number' ? v : parseFloat(v);
                 return Number.isFinite(n) ? n : fallback;
             };
 
@@ -2061,32 +2301,39 @@
             // Use order.items if available (from API response), otherwise use savedCart
             const items = order.items && order.items.length ? order.items : savedCart;
 
-            console.log('Receipt items data:', items);
+            console.log('Processing items for receipt:', items);
 
             // Pre-build item rows HTML with proper market price and profit calculation
             const itemRowsHtml = items.map(item => {
-                // MARKET PRICE = regular_market_price from OrderItem model
+                // Get product name with multiple fallbacks
+                const productName = item.name || 
+                                (item.product ? item.product.name : null) || 
+                                (item.inventoryItem ? item.inventoryItem.name : null) || 
+                                'Unknown Product';
+
+                // Get quantity
+                const quantity = getNumber(item.quantity || item.qty || 0, 0);
+                
+                // Get prices with fallbacks
                 const marketPrice = getNumber(
-                    item.regular_market_price ||  // From OrderItem model
-                    item.market_price ||          // Fallback to market_price
+                    item.regular_market_price ||
+                    item.market_price ||
                     (item.product ? item.product.market_price : null) ||
                     (item.inventoryItem ? item.inventoryItem.market_price : null) ||
-                    item.unit_price ||            // Final fallback
+                    item.unit_price ||
                     0
                 );
 
-                // OUR PRICE = regular_selling_price from OrderItem model (original selling price)
                 const ourPrice = getNumber(
-                    item.regular_selling_price || // This should be the original selling price
-                    item.original_price ||        // Fallback to original_price
-                    item.unit_price ||            // Fallback to unit_price
+                    item.regular_selling_price ||
+                    item.original_price ||
+                    item.unit_price ||
                     item.price ||
                     0
                 );
 
-                // ACTUAL CHARGED PRICE = unit_price from OrderItem model
                 const chargedPrice = getNumber(
-                    item.unit_price || // This is the actual price charged in the order
+                    item.unit_price ||
                     item.cartPrice ||
                     item.price ||
                     0
@@ -2100,41 +2347,20 @@
                     0
                 );
 
-                // Get quantity
-                const quantity = getNumber(item.quantity || item.qty || 0, 0);
-                
-                // Calculate line total using the ACTUAL CHARGED PRICE
+                // Calculate line total
                 const lineTotal = getNumber(
                     item.line_total || 
                     item.total || 
-                    (quantity * chargedPrice), // Use chargedPrice for calculation
+                    (quantity * chargedPrice),
                     0
                 );
 
                 subtotal += lineTotal;
 
-                // Calculate profit: (Charged Price - Cost Price) * Quantity
+                // Calculate profit
                 const profitPerItem = chargedPrice - costPrice;
                 const totalProfitPerLine = profitPerItem * quantity;
                 totalProfit += totalProfitPerLine;
-
-                // Get product name - FIXED: productName was not defined
-                const productName = item.name || 
-                                (item.product ? item.product.name : null) || 
-                                (item.inventoryItem ? item.inventoryItem.name : null) || 
-                                'Item';
-
-                // Debug log for each item
-                console.log('Item details:', {
-                    productName,
-                    marketPrice,
-                    ourPrice,
-                    chargedPrice,
-                    quantity,
-                    lineTotal,
-                    profitPerLine: totalProfitPerLine,
-                    itemData: item // Log the entire item object to see available fields
-                });
 
                 return `
                     <div class="item-row">
@@ -2161,7 +2387,7 @@
 
             // Safe paymentData defaults
             paymentData = paymentData || {};
-            const paymentMethod = (paymentData.method || paymentData.payment_method || 'N/A').toString().toLowerCase();
+            const paymentMethod = (paymentData.method || paymentData.payment_method || 'cash').toString().toLowerCase();
 
             // Build receipt HTML with company information
             const receiptContent = `
@@ -2191,19 +2417,20 @@
                             font-weight: 700; 
                             font-size: 18px;
                             margin-bottom: 3px;
+                            color: #2c3e50;
                         }
                         .company-contact {
                             font-size: 12px;
                             color: var(--muted);
-                            margin: 4px 0;
+                            margin: 2px 0;
                             line-height: 1.4;
                         }
                         .receipt-meta { 
-                            font-size: 12px; 
+                            font-size: 11px; 
                             color: var(--muted); 
-                            margin-top: 4px; 
+                            margin-top: 6px; 
                             border-top: 1px dashed #eee;
-                            padding-top: 4px;
+                            padding-top: 6px;
                         }
                         .customer-block {
                             margin: 10px 0;
@@ -2225,28 +2452,35 @@
                             font-size: 12px;
                             color: var(--muted);
                             padding: 6px 0;
+                            border-bottom: 1px solid #eee;
                         }
                         .line { border-bottom: 1px dashed #eee; margin: 6px 0; }
                         .item-row {
                             display: grid;
                             grid-template-columns: 3fr 1fr 1fr 1fr;
                             gap: 6px;
-                            align-items: center;
-                            padding: 6px 0;
+                            align-items: start;
+                            padding: 8px 0;
+                            border-bottom: 1px dashed #f0f0f0;
                         }
                         .item-name { 
                             font-size: 13px;
+                            line-height: 1.3;
                         }
-                        .price-details { font-size: 12px; color: var(--muted); margin-top: 4px; }
+                        .price-details { 
+                            font-size: 11px; 
+                            color: var(--muted); 
+                            margin-top: 2px; 
+                        }
                         .market-price-value { 
                             color: #8a8f98; 
-                            font-size: 12px; 
+                            font-size: 11px; 
                             text-decoration: line-through;
                             text-align: center;
                         }
                         .our-price-value { 
                             color: var(--accent); 
-                            font-weight: 700; 
+                            font-weight: 600; 
                             font-size: 12px;
                             text-align: center;
                         }
@@ -2254,15 +2488,24 @@
                             text-align: right; 
                             font-weight: 700; 
                             color: var(--accent);
+                            font-size: 12px;
                         }
-                        .line-profit { margin-top: -6px; margin-bottom: 6px; }
-                        .totals-section { margin-top: 8px; }
+                        .line-profit { 
+                            margin-top: 2px; 
+                            margin-bottom: 4px; 
+                            font-size: 11px;
+                            text-align: right;
+                        }
+                        .totals-section { 
+                            margin-top: 12px; 
+                            border-top: 2px solid #eee;
+                            padding-top: 8px;
+                        }
                         .item-row.total-line { 
                             display: flex; 
                             justify-content: space-between; 
-                            padding-top: 8px; 
-                            border-top: 1px dashed #ddd; 
-                            font-weight: 700; 
+                            padding: 4px 0; 
+                            font-weight: 600; 
                         }
                         .small-muted { font-size: 12px; color: var(--muted); }
                         .profit-total {
@@ -2270,39 +2513,47 @@
                             font-size: 15px;
                             color: var(--success);
                             text-align: center;
-                            margin: 10px 0;
+                            margin: 12px 0;
                             background-color: var(--bg);
-                            padding: 8px;
+                            padding: 10px;
                             border-radius: 6px;
                             border: 1px solid rgba(40,167,69,0.15);
                         }
                         .payment-info { 
-                            margin-top: 8px; 
+                            margin-top: 12px; 
                             font-size: 13px; 
                             background: #f8f9fa;
-                            padding: 10px;
+                            padding: 12px;
                             border-radius: 6px;
+                            border: 1px solid #e9ecef;
                         }
                         .payment-info div { margin: 4px 0; }
                         .thank-you { 
                             text-align: center; 
-                            margin-top: 10px; 
+                            margin-top: 15px; 
                             font-weight: 700; 
                             color: var(--accent);
+                            font-size: 14px;
                         }
-                        .no-print { margin-top: 12px; text-align: center; }
+                        .no-print { 
+                            margin-top: 15px; 
+                            text-align: center; 
+                            padding-top: 15px;
+                            border-top: 1px dashed #ddd;
+                        }
                         button { 
-                            padding: 8px 14px; 
+                            padding: 8px 16px; 
                             border-radius: 6px; 
                             border: none; 
                             cursor: pointer; 
                             font-weight: 600;
+                            font-size: 13px;
                             transition: all 0.3s ease;
+                            margin: 0 4px;
                         }
                         .btn-print { 
                             background: var(--accent); 
                             color: #fff; 
-                            margin-right: 6px; 
                         }
                         .btn-print:hover { background: #1a252f; }
                         .btn-close { 
@@ -2311,8 +2562,9 @@
                         }
                         .btn-close:hover { background: #c0392b; }
                         @media print {
-                            body { margin: 0; padding: 6px; max-width: 320px; }
+                            body { margin: 0; padding: 8px; max-width: 380px; font-size: 12px; }
                             .no-print { display: none; }
+                            .header { margin-bottom: 8px; }
                         }
                     </style>
                 </head>
@@ -2322,54 +2574,51 @@
                         ${companyAddress ? `<div class="company-contact">${escapeHtml(companyAddress)}</div>` : ''}
                         ${companyPhone ? `<div class="company-contact">📞 ${escapeHtml(companyPhone)}</div>` : ''}
                         ${companyEmail ? `<div class="company-contact">✉️ ${escapeHtml(companyEmail)}</div>` : ''}
-                        <div class="receipt-meta">Order #: ${escapeHtml(orderNumber)} • ${new Date().toLocaleString()}</div>
+                        <div class="receipt-meta">Order #: ${escapeHtml(orderNumber)}</div>
+                        <div class="receipt-meta"> ${new Date().toLocaleString()}</div>
                     </div>
 
+                    ${selectedCustomer ? `
                     <div class="customer-block">
-                        <div><strong>Customer:</strong> ${escapeHtml(selectedCustomer?.name ?? 'Walk-in Customer')}</div>
-                        <div><strong>Phone:</strong> ${escapeHtml(selectedCustomer?.phone_1 ?? 'N/A')}</div>
+                        <div><strong>Customer:</strong> ${escapeHtml(selectedCustomer?.name || 'Walk-in Customer')}</div>
+                        <div><strong>Phone:</strong> ${escapeHtml(selectedCustomer?.phone_1 || 'N/A')}</div>
                     </div>
+                    ` : ''}
 
                     <div class="items-section">
                         <div class="item-header">
-                            <div>ITEM (QTY)</div>
-                            <div style="text-align:center">MARKET PRICE</div>
-                            <div style="text-align:center">OUR PRICE</div>
+                            <div>ITEM</div>
+                            <div style="text-align:center">MARKET</div>
+                            <div style="text-align:center">PRICE</div>
                             <div style="text-align:right">TOTAL</div>
                         </div>
 
-                        <div class="line"></div>
-
-                        ${itemRowsHtml}
+                        ${itemRowsHtml || '<div class="item-row"><div>No items</div></div>'}
 
                     </div>
 
                     <div class="totals-section">
                         <div class="item-row total-line">
                             <div>Subtotal:</div>
-                            <div></div>
-                            <div></div>
                             <div>Rs.${subtotal.toFixed(2)}</div>
                         </div>
                         ${getNumber(discount, 0) > 0 ? `
-                        <div class="item-row total-line" style="font-weight:600;">
+                        <div class="item-row total-line">
                             <div>Discount:</div>
-                            <div></div>
-                            <div></div>
                             <div>- Rs.${getNumber(discount).toFixed(2)}</div>
                         </div>
                         ` : ''}
-                        <div class="item-row total-line" style="font-size:15px;">
-                            <div>GRAND TOTAL:</div>
-                            <div></div>
-                            <div></div>
-                            <div>Rs.${(subtotal - getNumber(discount, 0)).toFixed(2)}</div>
+                        <div class="item-row total-line" style="font-size:16px; border-top: 1px solid #ddd; padding-top: 8px;">
+                            <div><strong>GRAND TOTAL:</strong></div>
+                            <div><strong>Rs.${(subtotal - getNumber(discount, 0)).toFixed(2)}</strong></div>
                         </div>
                     </div>
 
+                    ${totalProfit > 0 ? `
                     <div class="profit-total">
-                        YOUR TOTAL PROFIT = Rs.${totalProfit.toFixed(2)}
+                        TOTAL PROFIT: Rs.${totalProfit.toFixed(2)}
                     </div>
+                    ` : ''}
 
                     <div class="payment-info">
                         <div><strong>Payment Method:</strong> ${escapeHtml(paymentMethod.toUpperCase())}</div>
@@ -2378,12 +2627,12 @@
                             <div>Balance: Rs.${getNumber(paymentData.balance, (getNumber(paymentData.amount_received, subtotal) - (subtotal - getNumber(discount,0)))).toFixed(2)}</div>
                         ` : ''}
                         ${paymentMethod === 'card' ? `
-                            <div>Reference: ${escapeHtml(paymentData.reference ?? paymentData.ref ?? 'N/A')}</div>
+                            <div>Reference: ${escapeHtml(paymentData.reference || paymentData.ref || 'N/A')}</div>
                             ${paymentData.bank ? `<div>Bank: ${escapeHtml(paymentData.bank)}</div>` : ''}
                         ` : ''}
                         ${paymentMethod === 'cheque' ? `
-                            <div>Cheque No: ${escapeHtml(paymentData.cheque_no ?? paymentData.chequeNumber ?? 'N/A')}</div>
-                            <div>Bank: ${escapeHtml(paymentData.bank ?? 'N/A')}</div>
+                            <div>Cheque No: ${escapeHtml(paymentData.cheque_no || paymentData.chequeNumber || 'N/A')}</div>
+                            <div>Bank: ${escapeHtml(paymentData.bank || 'N/A')}</div>
                             ${paymentData.remarks ? `<div>Remarks: ${escapeHtml(paymentData.remarks)}</div>` : ''}
                         ` : ''}
                         ${paymentMethod === 'credit' ? `
@@ -2406,19 +2655,40 @@
 
             // Open receipt in new window and write it
             const receiptWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes');
-            receiptWindow.document.write(receiptContent);
-            receiptWindow.document.close();
+            if (receiptWindow) {
+                receiptWindow.document.write(receiptContent);
+                receiptWindow.document.close();
+                
+                // Auto-print after a short delay
+                setTimeout(() => {
+                    try { 
+                        receiptWindow.print(); 
+                    } catch (e) { 
+                        console.log('Print may be blocked by browser:', e);
+                        // Show print dialog manually
+                        receiptWindow.document.execCommand('print', false, null);
+                    }
+                }, 500);
+            } else {
+                alert('Please allow popups for receipt printing');
+            }
 
-            // Auto-print after a short delay
-            setTimeout(() => {
-                try { 
-                    receiptWindow.print(); 
-                } catch (e) { 
-                    console.log('Print may be blocked by browser:', e);
-                }
-            }, 500);
+            // Helper function to format company address
+            function formatCompanyAddress(company) {
+                if (!company) return '';
+                const addressParts = [
+                    company.address_line_1,
+                    company.address_line_2,
+                    company.address_line_3,
+                    company.city,
+                    company.postal_code,
+                    company.country
+                ].filter(part => part && part.trim() !== '');
+                
+                return addressParts.join(', ');
+            }
 
-            // Small HTML-escape helper to avoid injected HTML from item names
+            // Small HTML-escape helper
             function escapeHtml(str) {
                 if (str === null || typeof str === 'undefined') return '';
                 return String(str)
@@ -2606,8 +2876,6 @@
                 const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
                 const total = subtotal - discount;
 
-                const userId = 1; // For demo purposes
-
                 // Prepare items data with correct field names
                 const items = cart.map(item => ({
                     product_id: parseInt(item.id),
@@ -2624,11 +2892,11 @@
                     subtotal: parseFloat(subtotal),
                     discount: parseFloat(discount),
                     total: parseFloat(total),
-                    user_id: parseInt(userId),
+                    user_id: {{ $user->id }}, 
                     items: items
                 };
 
-                console.log('Sending draft data:', draftData); // For debugging
+                console.log('Sending draft data:', draftData);
 
                 const response = await fetch('/api/draft-invoices', {
                     method: 'POST',
@@ -2639,6 +2907,14 @@
                     },
                     body: JSON.stringify(draftData)
                 });
+
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text.substring(0, 200));
+                    throw new Error('Server returned non-JSON response. Please check the API endpoint.');
+                }
 
                 const result = await response.json();
 
@@ -2653,18 +2929,23 @@
                     throw new Error(result.message || 'Failed to save draft invoice');
                 }
 
-                // Success - clear cart and show success message
+                // Success - show draft bill popup with the saved data
+                console.log('Draft bill saved successfully:', result);
+                
+                // Show draft bill popup with cart data and response data
+                showDraftBillPopup(result.invoice, cart, discount);
+                
+                // Clear cart but don't show notification since we're showing popup
+                const savedCart = [...cart]; // Save cart for popup
                 cart = [];
                 renderCart();
                 document.getElementById('discount-input').value = '';
 
-                showNotification('success', 'Draft saved successfully!');
                 playSuccessSound();
 
             } catch (error) {
                 console.error('Error saving draft invoice:', error);
                 
-                // Show more detailed error message
                 let errorMessage = error.message || 'Failed to save draft invoice';
                 if (errorMessage.includes('Validation failed') || errorMessage.includes('errors')) {
                     errorMessage = 'Please check your data and try again.';
@@ -2673,6 +2954,242 @@
                 showNotification('error', errorMessage);
                 playErrorSound();
             }
+        }
+                
+
+        // Show draft bill popup with saved data
+        function showDraftBillPopup(draftInvoice, cartItems, discount) {
+            const popup = document.getElementById('draft-bill-popup');
+            
+            // Update popup content with draft bill data
+            document.getElementById('draft-bill-number').textContent = `Draft Bill #${draftInvoice.id}`;
+            document.getElementById('draft-bill-date').textContent = new Date(draftInvoice.created_at).toLocaleString();
+            
+            // Customer info
+            const customerName = selectedCustomer ? selectedCustomer.name : 'Walk-in Customer';
+            document.getElementById('draft-bill-customer').textContent = customerName;
+            
+            // Items count
+            document.getElementById('draft-bill-items-count').textContent = cartItems.length;
+            
+            // Financial data - use the data from the response
+            document.getElementById('draft-bill-subtotal').textContent = parseFloat(draftInvoice.subtotal).toFixed(2);
+            document.getElementById('draft-bill-discount').textContent = parseFloat(draftInvoice.discount).toFixed(2);
+            document.getElementById('draft-bill-total').textContent = parseFloat(draftInvoice.total).toFixed(2);
+            
+            // Summary data
+            document.getElementById('draft-summary-subtotal').textContent = parseFloat(draftInvoice.subtotal).toFixed(2);
+            document.getElementById('draft-summary-discount').textContent = parseFloat(draftInvoice.discount).toFixed(2);
+            document.getElementById('draft-summary-total').textContent = parseFloat(draftInvoice.total).toFixed(2);
+            
+            // Populate items list
+            const itemsList = document.getElementById('draft-bill-items-list');
+            itemsList.innerHTML = '';
+            
+            cartItems.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'draft-bill-item';
+                itemElement.innerHTML = `
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; font-size: 14px;">${item.name}</div>
+                        <div style="font-size: 12px; color: var(--muted);">
+                            Qty: ${item.qty} × Rs.${parseFloat(item.cartPrice).toFixed(2)}
+                        </div>
+                    </div>
+                    <div style="font-weight: 600; color: var(--accent);">
+                        Rs.${parseFloat(item.total).toFixed(2)}
+                    </div>
+                `;
+                itemsList.appendChild(itemElement);
+            });
+            
+            // Show the popup
+            popup.style.display = 'flex';
+            
+            // Store draft invoice ID for printing
+            window.currentDraftInvoice = draftInvoice;
+        }
+
+        // Close draft bill popup
+        function closeDraftBillPopup() {
+            document.getElementById('draft-bill-popup').style.display = 'none';
+            // Optionally reload the page to start fresh
+            // window.location.reload();
+        }
+
+        // View all draft bills
+        function viewAllDraftBills() {
+            closeDraftBillPopup();
+            window.location.href = '/draft-bills';
+        }
+
+        // Print draft bill
+        function printDraftBill() {
+            const draftInvoice = window.currentDraftInvoice;
+            
+            if (!draftInvoice) {
+                alert('No draft bill data available for printing');
+                return;
+            }
+
+            const draftBillNumber = document.getElementById('draft-bill-number').textContent;
+            const draftBillDate = document.getElementById('draft-bill-date').textContent;
+            const customerName = document.getElementById('draft-bill-customer').textContent;
+            const subtotal = document.getElementById('draft-bill-subtotal').textContent;
+            const discount = document.getElementById('draft-bill-discount').textContent;
+            const total = document.getElementById('draft-bill-total').textContent;
+            
+            const printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Draft Bill</title>
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            margin: 20px; 
+                            max-width: 400px;
+                            color: #333;
+                        }
+                        .header { 
+                            text-align: center; 
+                            margin-bottom: 20px;
+                            border-bottom: 2px solid #333;
+                            padding-bottom: 10px;
+                        }
+                        .company-name { 
+                            font-size: 24px; 
+                            font-weight: bold; 
+                            margin-bottom: 5px;
+                        }
+                        .bill-info { 
+                            margin: 15px 0; 
+                            padding: 10px;
+                            background: #f5f5f5;
+                            border-radius: 5px;
+                        }
+                        .bill-info div { margin: 5px 0; }
+                        .items { margin: 15px 0; }
+                        .item { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            padding: 5px 0;
+                            border-bottom: 1px dashed #ccc;
+                        }
+                        .item-details {
+                            flex: 1;
+                        }
+                        .item-name {
+                            font-weight: bold;
+                        }
+                        .item-meta {
+                            font-size: 12px;
+                            color: #666;
+                        }
+                        .item-total {
+                            font-weight: bold;
+                            color: #2c3e50;
+                        }
+                        .totals { 
+                            margin-top: 20px; 
+                            border-top: 2px solid #333;
+                            padding-top: 10px;
+                        }
+                        .total-line { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            margin: 5px 0;
+                        }
+                        .grand-total { 
+                            font-size: 18px; 
+                            font-weight: bold; 
+                            color: #2c3e50;
+                        }
+                        .footer { 
+                            text-align: center; 
+                            margin-top: 30px; 
+                            font-size: 12px;
+                            color: #666;
+                        }
+                        @media print {
+                            body { margin: 10px; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="company-name">${companyInfo?.name || 'LUXURY STORE'}</div>
+                        <div>DRAFT BILL</div>
+                    </div>
+                    
+                    <div class="bill-info">
+                        <div><strong>Bill Number:</strong> ${draftBillNumber}</div>
+                        <div><strong>Date:</strong> ${draftBillDate}</div>
+                        <div><strong>Customer:</strong> ${customerName}</div>
+                        <div><strong>Status:</strong> DRAFT</div>
+                        <div><strong>Items Count:</strong> ${draftInvoice.items_count || document.querySelectorAll('.draft-bill-item').length}</div>
+                    </div>
+                    
+                    <div class="items">
+                        <div style="text-align: center; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">ITEMS</div>
+                        ${Array.from(document.querySelectorAll('.draft-bill-item')).map(item => {
+                            const itemName = item.querySelector('div:first-child div:first-child').textContent;
+                            const itemDetails = item.querySelector('div:first-child div:last-child').textContent;
+                            const itemTotal = item.querySelector('div:last-child').textContent;
+                            
+                            return `
+                                <div class="item">
+                                    <div class="item-details">
+                                        <div class="item-name">${itemName}</div>
+                                        <div class="item-meta">${itemDetails}</div>
+                                    </div>
+                                    <div class="item-total">${itemTotal}</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    
+                    <div class="totals">
+                        <div class="total-line">
+                            <span>Subtotal:</span>
+                            <span>Rs.${subtotal}</span>
+                        </div>
+                        <div class="total-line">
+                            <span>Discount:</span>
+                            <span>- Rs.${discount}</span>
+                        </div>
+                        <div class="total-line grand-total">
+                            <span>GRAND TOTAL:</span>
+                            <span>Rs.${total}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="footer">
+                        <div>*** DRAFT BILL - NOT FOR PAYMENT ***</div>
+                        <div>Generated on ${new Date().toLocaleString()}</div>
+                        <div class="no-print" style="margin-top: 20px;">
+                            <button onclick="window.print()" style="padding: 10px 20px; background: #2c3e50; color: white; border: none; border-radius: 5px; cursor: pointer;">Print Receipt</button>
+                            <button onclick="window.close()" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">Close</button>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            const printWindow = window.open('', '_blank', 'width=600,height=700');
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            
+            // Auto-print after a short delay
+            setTimeout(() => {
+                try { 
+                    printWindow.print(); 
+                } catch (e) { 
+                    console.log('Print may be blocked by browser:', e);
+                    // Show print button in the print window
+                }
+            }, 500);
         }
     </script>
 </body>

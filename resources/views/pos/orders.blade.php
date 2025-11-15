@@ -362,26 +362,22 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Popup -->
-    <div id="delete-confirm-popup" class="popup-container" style="display: none;">
-        <div class="popup-content">
+    <!-- Return Order Modal -->
+    <div class="popup-container" id="return-order-popup" style="display: none;">
+        <div class="popup-content" style="max-width: 800px;">
             <div class="popup-header">
-                <h3><i class="fas fa-exclamation-triangle"></i> Confirm Order Deletion</h3>
-                <button class="popup-close" onclick="closeDeleteConfirmPopup()">&times;</button>
+                <h3><i class="fas fa-undo"></i> Process Order Return</h3>
+                <button class="popup-close" onclick="closeReturnOrderPopup()">&times;</button>
             </div>
-            <div class="popup-body">
-                <div style="text-align: center; padding: 20px 0;">
-                    <i class="fas fa-trash-alt" style="font-size: 48px; color: #e74c3c; margin-bottom: 15px;"></i>
-                    <h4 style="margin: 10px 0; color: #2c3e50;">Delete Order?</h4>
-                    <p style="color: #666; margin: 0;">Are you sure you want to delete this order? This action cannot be undone and all order data will be permanently lost.</p>
-                </div>
+            <div class="popup-body" id="return-order-body">
+                <!-- Return order content will be dynamically inserted here -->
             </div>
             <div class="popup-footer">
-                <button class="popup-btn cancel" onclick="closeDeleteConfirmPopup()">
+                <button class="popup-btn cancel" onclick="closeReturnOrderPopup()">
                     <i class="fas fa-times"></i> Cancel
                 </button>
-                <button class="popup-btn confirm" onclick="confirmDeleteOrder()" style="background-color: #e74c3c; border-color: #e74c3c;">
-                    <i class="fas fa-trash"></i> Delete Order
+                <button class="popup-btn confirm" onclick="processOrderReturn()" id="process-return-btn">
+                    <i class="fas fa-check"></i> Process Return
                 </button>
             </div>
         </div>
@@ -390,6 +386,10 @@
     <script>
         let currentReceiptData = null;
         let deleteOrderId = null;
+        let currentReturnOrderId = null;
+        let selectedReturnItems = [];
+        let returnReason = '';
+        let refundAmount = 0;
 
         async function loadOrders() {
             const content = document.getElementById('orders-content');
@@ -462,14 +462,11 @@
                 <thead>
                     <tr>
                         <th>Order ID</th>
-                        <th>Date</th>
                         <th>Customer</th>
-                        <th>Items</th>
                         <th>Subtotal</th>
                         <th>Discount</th>
                         <th>Total</th>
                         <th>Status</th>
-                        <th>Payment</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -482,30 +479,41 @@
                 
                 html += `<tr>
                     <td><strong>${order.order_id}</strong></td>
-                    <td>${new Date(order.order_date).toLocaleString()}</td>
                     <td>${order.customer_name || 'Walk-in Customer'}</td>
-                    <td>${order.items_count || 0}</td>
                     <td>Rs.${parseFloat(order.subtotal).toFixed(2)}</td>
                     <td>Rs.${parseFloat(order.discount).toFixed(2)}</td>
                     <td><strong>Rs.${parseFloat(order.total).toFixed(2)}</strong></td>
                     <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                    <td>${order.payment_status || 'N/A'}</td>
                     <td class="actions">
-                        <a onclick="showOrderDetails(${order.id})" title="View Details"><i class="fas fa-eye"></i> View</a>
-                        <a onclick="showPaymentDetails(${order.id})" title="Payment Info"><i class="fas fa-credit-card"></i> Payment</a>
-                        <a onclick="showReceipt(${order.id})" title="View Receipt"><i class="fas fa-receipt"></i> Receipt</a>
+                        <a onclick="showOrderDetails(${order.id})"><i class="fas fa-eye"></i> View</a>
+                        <a onclick="showPaymentDetails(${order.id})"><i class="fas fa-credit-card"></i> Payment</a>
+                        <a onclick="showReceipt(${order.id})"><i class="fas fa-receipt"></i> Receipt</a>
+
                         ${order.status === 'pending' ? `
-                            <a onclick="updateOrderStatus(${order.id}, 'processing')" title="Mark as Processing" style="color: #f39c12;"><i class="fas fa-cog"></i> Process</a>
-                            <a onclick="updateOrderStatus(${order.id}, 'completed')" title="Mark as Completed" style="color: #27ae60;"><i class="fas fa-check"></i> Complete</a>
+                            <a onclick="updateOrderStatus(${order.id}, 'processing')" style="color:#f39c12;">
+                                <i class="fas fa-cog"></i> Process
+                            </a>
+                            <a onclick="updateOrderStatus(${order.id}, 'completed')" style="color:#27ae60;">
+                                <i class="fas fa-check"></i> Complete
+                            </a>
                         ` : ''}
+
                         ${order.status === 'processing' ? `
-                            <a onclick="updateOrderStatus(${order.id}, 'completed')" title="Mark as Completed" style="color: #27ae60;"><i class="fas fa-check"></i> Complete</a>
+                            <a onclick="updateOrderStatus(${order.id}, 'completed')" style="color:#27ae60;">
+                                <i class="fas fa-check"></i> Complete
+                            </a>
                         ` : ''}
+
                         ${canDelete ? `
-                            <a onclick="deleteOrder(${order.id})" title="Delete Order" style="color: #e74c3c;"><i class="fas fa-trash"></i> Delete</a>
+                            <a onclick="deleteOrder(${order.id})" style="color:#e74c3c;">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
                         ` : ''}
-                        ${order.status !== 'canceled' && !canDelete ? `
-                            <a onclick="updateOrderStatus(${order.id}, 'canceled')" title="Cancel Order" style="color: #e74c3c;"><i class="fas fa-times"></i> Cancel</a>
+
+                        ${order.status === 'completed' ? `
+                            <a onclick="showReturnOrder(${order.id})" style="color:#17a2b8;">
+                                <i class="fas fa-undo"></i> Return
+                            </a>
                         ` : ''}
                     </td>
                 </tr>`;
@@ -514,6 +522,7 @@
             html += `</tbody></table>`;
             document.getElementById('orders-content').innerHTML = html;
         }
+
 
         async function showOrderDetails(id) {
             const modal = document.getElementById('order-modal');
@@ -790,16 +799,6 @@
             body.innerHTML = html;
         }
 
-        // Delete order function
-        async function deleteOrder(id) {
-            deleteOrderId = id;
-            document.getElementById('delete-confirm-popup').style.display = 'flex';
-        }
-
-        function closeDeleteConfirmPopup() {
-            document.getElementById('delete-confirm-popup').style.display = 'none';
-            deleteOrderId = null;
-        }
 
         async function confirmDeleteOrder() {
             if (!deleteOrderId) return;
@@ -1160,6 +1159,287 @@
                 setTimeout(() => btn.classList.remove('refreshing'), 700);
             });
         });
+
+        // Return Orders
+        async function showReturnOrder(orderId) {
+            currentReturnOrderId = orderId;
+            selectedReturnItems = [];
+            returnReason = '';
+            refundAmount = 0;
+            
+            const modal = document.getElementById('return-order-popup');
+            const body = document.getElementById('return-order-body');
+            body.innerHTML = '<div class="loading">Loading order details...</div>';
+            modal.style.display = 'flex';
+            
+            try {
+                const res = await fetch(`/api/orders/${orderId}`);
+                if (!res.ok) throw new Error('Failed to fetch order details');
+                const order = await res.json();
+                
+                renderReturnOrderForm(order);
+            } catch (e) {
+                console.error('Error loading order for return:', e);
+                body.innerHTML = '<div class="error">Error loading order details: ' + e.message + '</div>';
+            }
+        }
+
+        function renderReturnOrderForm(order) {
+            const body = document.getElementById('return-order-body');
+            
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px; color: #2c3e50;">Order #${order.order_id}</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <p><strong>Customer:</strong> ${order.customer_name}</p>
+                            <p><strong>Order Date:</strong> ${new Date(order.order_date).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                            <p><strong>Original Total:</strong> Rs.${parseFloat(order.total).toFixed(2)}</p>
+                            <p><strong>Payment Method:</strong> ${order.payment_method || 'N/A'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Return Reason:</label>
+                    <select id="return-reason" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" onchange="updateReturnReason(this.value)">
+                        <option value="">Select Reason</option>
+                        <option value="defective">Defective Product</option>
+                        <option value="wrong_item">Wrong Item Received</option>
+                        <option value="damaged">Damaged During Delivery</option>
+                        <option value="not_as_described">Not as Described</option>
+                        <option value="customer_change_mind">Customer Changed Mind</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <textarea id="return-reason-other" placeholder="Please specify reason..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px; display: none;" oninput="updateReturnReason(this.value)"></textarea>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <h5 style="margin-bottom: 10px;">Select Items to Return:</h5>
+                    <div style="border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f8f9fa;">
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; width: 30px;"></th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0;">Product</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #e0e0e0;">Original Qty</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #e0e0e0;">Return Qty</th>
+                                    <th style="padding: 10px; text-align: right; border-bottom: 1px solid #e0e0e0;">Unit Price</th>
+                                    <th style="padding: 10px; text-align: right; border-bottom: 1px solid #e0e0e0;">Refund Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="return-items-table">
+            `;
+            
+            order.items.forEach((item, index) => {
+                html += `
+                    <tr style="border-bottom: 1px solid #f0f0f0;">
+                        <td style="padding: 10px;">
+                            <input type="checkbox" id="item-${index}" onchange="toggleReturnItem(${index}, ${item.id}, '${item.product_name}', ${item.quantity}, ${item.unit_price})">
+                        </td>
+                        <td style="padding: 10px;">
+                            <label for="item-${index}" style="cursor: pointer;">
+                                ${item.product_name}
+                            </label>
+                        </td>
+                        <td style="padding: 10px; text-align: center;">${item.quantity}</td>
+                        <td style="padding: 10px; text-align: center;">
+                            <input type="number" id="return-qty-${index}" min="1" max="${item.quantity}" value="${item.quantity}" 
+                                style="width: 60px; padding: 4px; text-align: center; border: 1px solid #ddd; border-radius: 3px;"
+                                onchange="updateReturnQuantity(${index}, ${item.unit_price})" disabled>
+                        </td>
+                        <td style="padding: 10px; text-align: right;">Rs.${parseFloat(item.unit_price).toFixed(2)}</td>
+                        <td style="padding: 10px; text-align: right;">
+                            <span id="refund-amount-${index}">Rs.${parseFloat(item.unit_price * item.quantity).toFixed(2)}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 600;">
+                        <span>Total Refund Amount:</span>
+                        <span id="total-refund-amount">Rs.0.00</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Refund Method:</label>
+                    <select id="refund-method" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="original">Original Payment Method</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card Refund</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="store_credit">Store Credit</option>
+                    </select>
+                </div>
+
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #f39c12;"></i>
+                    <strong> Note:</strong> Processing this return will:
+                    <ul style="margin: 8px 0 0 20px;">
+                        <li>Update inventory stock for returned items</li>
+                        <li>Create a refund record</li>
+                        <li>Update order status if all items are returned</li>
+                        <li>This action cannot be undone</li>
+                    </ul>
+                </div>
+            `;
+            
+            body.innerHTML = html;
+            updateTotalRefundAmount();
+        }
+
+        function updateReturnReason(reason) {
+            returnReason = reason;
+            const otherTextarea = document.getElementById('return-reason-other');
+            if (reason === 'other') {
+                otherTextarea.style.display = 'block';
+                otherTextarea.required = true;
+            } else {
+                otherTextarea.style.display = 'none';
+                otherTextarea.required = false;
+                if (reason) {
+                    returnReason = reason;
+                }
+            }
+        }
+
+        function toggleReturnItem(index, itemId, productName, maxQuantity, unitPrice) {
+            const checkbox = document.getElementById(`item-${index}`);
+            const quantityInput = document.getElementById(`return-qty-${index}`);
+            
+            if (checkbox.checked) {
+                quantityInput.disabled = false;
+                quantityInput.value = maxQuantity;
+                
+                selectedReturnItems.push({
+                    index: index,
+                    itemId: itemId,
+                    productName: productName,
+                    quantity: maxQuantity,
+                    maxQuantity: maxQuantity,
+                    unitPrice: unitPrice,
+                    refundAmount: unitPrice * maxQuantity
+                });
+            } else {
+                quantityInput.disabled = true;
+                quantityInput.value = maxQuantity;
+                
+                selectedReturnItems = selectedReturnItems.filter(item => item.index !== index);
+            }
+            
+            updateTotalRefundAmount();
+        }
+
+        function updateReturnQuantity(index, unitPrice) {
+            const quantityInput = document.getElementById(`return-qty-${index}`);
+            const refundAmountSpan = document.getElementById(`refund-amount-${index}`);
+            const quantity = parseInt(quantityInput.value) || 0;
+            const maxQuantity = selectedReturnItems.find(item => item.index === index)?.maxQuantity || 0;
+            
+            if (quantity > maxQuantity) {
+                quantityInput.value = maxQuantity;
+                quantity = maxQuantity;
+            }
+            
+            if (quantity < 1) {
+                quantityInput.value = 1;
+                quantity = 1;
+            }
+            
+            const refundAmount = unitPrice * quantity;
+            refundAmountSpan.textContent = `Rs.${refundAmount.toFixed(2)}`;
+            
+            const itemIndex = selectedReturnItems.findIndex(item => item.index === index);
+            if (itemIndex !== -1) {
+                selectedReturnItems[itemIndex].quantity = quantity;
+                selectedReturnItems[itemIndex].refundAmount = refundAmount;
+            }
+            
+            updateTotalRefundAmount();
+        }
+
+        function updateTotalRefundAmount() {
+            refundAmount = selectedReturnItems.reduce((total, item) => total + item.refundAmount, 0);
+            document.getElementById('total-refund-amount').textContent = `Rs.${refundAmount.toFixed(2)}`;
+            
+            // Update process button state
+            const processBtn = document.getElementById('process-return-btn');
+            processBtn.disabled = selectedReturnItems.length === 0 || !returnReason || refundAmount === 0;
+        }
+
+        async function processOrderReturn() {
+            if (selectedReturnItems.length === 0 || !returnReason || refundAmount === 0) {
+                alert('Please select items to return and provide a reason.');
+                return;
+            }
+            
+            const refundMethod = document.getElementById('refund-method').value;
+            
+            if (!confirm(`Are you sure you want to process this return for Rs.${refundAmount.toFixed(2)}?`)) {
+                return;
+            }
+            
+            const processBtn = document.getElementById('process-return-btn');
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            
+            try {
+                const returnData = {
+                    order_id: currentReturnOrderId,
+                    return_reason: returnReason,
+                    refund_amount: refundAmount,
+                    refund_method: refundMethod,
+                    return_items: selectedReturnItems.map(item => ({
+                        order_item_id: item.itemId,
+                        quantity: item.quantity,
+                        refund_amount: item.refundAmount
+                    }))
+                };
+                
+                const res = await fetch('/api/orders/return', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(returnData)
+                });
+                
+                const result = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(result.message || 'Failed to process return');
+                }
+                
+                alert('Return processed successfully!');
+                closeReturnOrderPopup();
+                loadOrders(); // Refresh the orders list
+                
+            } catch (error) {
+                console.error('Error processing return:', error);
+                alert('Error processing return: ' + error.message);
+                processBtn.disabled = false;
+                processBtn.innerHTML = '<i class="fas fa-check"></i> Process Return';
+            }
+        }
+
+        function closeReturnOrderPopup() {
+            document.getElementById('return-order-popup').style.display = 'none';
+            currentReturnOrderId = null;
+            selectedReturnItems = [];
+            returnReason = '';
+            refundAmount = 0;
+        }
     </script>
 </body>
 </html>

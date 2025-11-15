@@ -42,6 +42,10 @@ Route::middleware(['web'])->group(function () {
     Route::get('/orders/{id}/payments', [ListOfOrdersController::class, 'getPayments']);
     Route::get('/orders/{id}/receipt', [ListOfOrdersController::class, 'getReceipt']);
     Route::put('/orders/{id}/status', [ListOfOrdersController::class, 'updateStatus']);
+
+    // Return order route
+    Route::post('/orders/return', [ReturnOrderController::class, 'processReturn']);
+    Route::get('/orders/{id}/returns', [ReturnOrderController::class, 'getReturnHistory']);
 });
 
 // Checkout route
