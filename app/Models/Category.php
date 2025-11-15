@@ -34,6 +34,12 @@ class Category extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function items()
+    {
+        return $this->hasMany(InventoryItem::class, 'category_id')
+                    ->where('available_quantity', '>', 0);
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -41,11 +47,5 @@ class Category extends Model
         static::creating(function ($model) {
             $model->created_by = auth()->id(); 
         });
-    }
-
-    public function items()
-    {
-        return $this->hasMany(InventoryItem::class, 'category', 'name')
-                    ->where('available_quantity', '>', 0);
     }
 }

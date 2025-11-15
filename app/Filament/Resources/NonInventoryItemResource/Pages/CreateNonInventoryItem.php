@@ -33,4 +33,9 @@ class CreateNonInventoryItem extends CreateRecord
                 ]),
         ];
     }
+
+    public static function getRedirectUrlAfterCreate(): string
+    {
+        return static::getUrl('index');
+    }
 }

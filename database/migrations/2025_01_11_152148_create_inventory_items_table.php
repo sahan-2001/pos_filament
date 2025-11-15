@@ -12,7 +12,7 @@ class CreateInventoryItemsTable extends Migration
             $table->id();
             $table->string('item_code')->unique();
             $table->string('name');
-            $table->string('category');
+            $table->foreignId('category_id')->nullable()->constrained('categories')->onDelete('set null');
             $table->text('special_note')->nullable();
             $table->string('uom');
             $table->integer('available_quantity')->default(0);

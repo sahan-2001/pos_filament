@@ -8,44 +8,37 @@ use App\Models\Category;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Forms\Components\Section;
-use Filament\Actions;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TextInputFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 
 class InventoryItemResource extends Resource
 {
     protected static ?string $model = InventoryItem::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
-    protected static ?string $navigationGroup = 'Inventory Management'; 
+    protected static ?string $navigationGroup = 'Inventory Management';
 
-    static function form(Forms\Form $form): Forms\Form
+    public static function form(Forms\Form $form): Forms\Form
     {
         return $form
             ->schema([
-                Section::make('Item Details')
+
+                Forms\Components\Section::make('Item Details')
                     ->schema([
+
                         Forms\Components\TextInput::make('item_code')
                             ->label('Item Code')
-                            ->disabled()
-                            ->default(fn () => self::generateItemCode()),
+                            ->unique(),
 
                         Forms\Components\TextInput::make('name')
-                            ->required()
-                            ->maxLength(255),
-
-                        Forms\Components\Select::make('category')
-                            ->label('Category')
-                            ->options(fn () => self::getCategoryOptions())
+                            ->label('Item Name')
                             ->required(),
 
-                        
+                        Forms\Components\Select::make('category_id')
+                            ->label('Category')
+                            ->relationship('categoryRelation', 'name')
+                            ->required()
+                            ->reactive(),
 
                         Forms\Components\Select::make('uom')
                             ->label('Unit of Measure')
@@ -54,44 +47,59 @@ class InventoryItemResource extends Resource
                                 'liters' => 'Liters',
                                 'meters' => 'Meters',
                                 'pcs' => 'Pcs',
-                                // ...other units...
                             ])
                             ->required(),
 
-                        Forms\Components\TextInput::make('available_quantity')
-                            ->hidden()
-                            ->default(0)
-                            ->numeric(),
-                        
                         Forms\Components\TextInput::make('barcode')
-                            ->label('Barcode')
                             ->numeric()
                             ->nullable(),
+
+                        Forms\Components\TextInput::make('available_quantity')
+                            ->numeric()
+                            ->default(0)
+                            ->hidden(), // user cannot manually edit
                     ])
                     ->columns(2),
 
-                Section::make('Additional Information')
+                Forms\Components\Section::make('Additional Information')
                     ->schema([
+
                         Forms\Components\TextInput::make('moq')
-                            ->label('Minimum Order Quantity/ Alert Quantity')
                             ->numeric()
+                            ->label('Minimum Order Quantity / Alert Qty')
                             ->nullable(),
 
                         Forms\Components\TextInput::make('max_stock')
-                            ->label('Maximum Stock Level')
                             ->numeric()
+                            ->label('Maximum Stock Level')
                             ->nullable(),
 
+                        Forms\Components\TextInput::make('market_price')
+                            ->numeric()
+                            ->label('Market Price')
+                            ->step('0.01')
+                            ->nullable(),
+
+                        Forms\Components\TextInput::make('selling_price')
+                            ->numeric()
+                            ->label('Selling Price')
+                            ->step('0.01'),
+
+                        Forms\Components\TextInput::make('cost')
+                            ->numeric()
+                            ->label('Cost Price')
+                            ->step('0.01'),
+
                         Forms\Components\FileUpload::make('image')
-                            ->label('Item Image')
                             ->image()
                             ->directory('items')
                             ->imageEditor()
                             ->nullable(),
-                        
+
                         Forms\Components\Textarea::make('special_note')
-                            ->label('Special Note')
+                            ->columnSpanFull()
                             ->nullable(),
+
                     ])
                     ->columns(2)
                     ->collapsible(),
@@ -102,71 +110,60 @@ class InventoryItemResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('item_code')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('category')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('uom')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('available_quantity')->sortable()->searchable(),
-                ...(
-                Auth::user()->can('view audit columns')
-                    ? [
-                        TextColumn::make('created_by')->label('Created By')->toggleable()->sortable(),
-                        TextColumn::make('updated_by')->label('Updated By')->toggleable()->sortable(),
-                        TextColumn::make('created_at')->label('Created At')->toggleable()->dateTime()->sortable(),
-                        TextColumn::make('updated_at')->label('Updated At')->toggleable()->dateTime()->sortable(),
-                    ]
-                    : []
-                    ),
+                Tables\Columns\TextColumn::make('item_code')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
+
+                Tables\Columns\TextColumn::make('categoryRelation.name')
+                    ->label('Category')
+                    ->searchable()->sortable(),
+
+                Tables\Columns\TextColumn::make('uom')->label('UOM')->sortable(),
+
+                Tables\Columns\TextColumn::make('available_quantity')
+                    ->label('Available Qty')
+                    ->sortable(),
             ])
             ->filters([
-                SelectFilter::make('category')
+                Tables\Filters\SelectFilter::make('category_id')
                     ->label('Category')
-                    ->options(fn () => InventoryItem::query()->distinct()->pluck('category', 'category')->toArray()),
+                    ->relationship('categoryRelation', 'name'),
 
-                SelectFilter::make('uom')
-                    ->label('Unit of Measure')
+                Tables\Filters\SelectFilter::make('uom')
                     ->options([
                         'kg' => 'Kg',
                         'liters' => 'Liters',
                         'meters' => 'Meters',
                         'pcs' => 'Pcs',
-                        // Add more if needed
                     ]),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->visible(fn (InventoryItem $record) => auth()->user()->can('edit inventory items')),
+                    ->visible(fn ($record) => Auth::user()->can('edit inventory items')),
+
                 Tables\Actions\DeleteAction::make()
-                ->visible(fn (InventoryItem $record) =>
-                    auth()->user()->can('delete inventory items') &&
-                    $record->available_quantity < 1
-                ),
+                    ->visible(fn ($record) =>
+                        Auth::user()->can('delete inventory items') &&
+                        $record->available_quantity < 1
+                    ),
             ])
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make()
-                    ->visible(fn () => auth()->user()->can('delete inventory items'))
+                    ->visible(fn () => Auth::user()->can('delete inventory items'))
                     ->before(function (Collection $records) {
-                        $blocked = $records->filter(fn ($record) => $record->available_quantity >= 1);
+                        $blocked = $records->filter(fn ($r) => $r->available_quantity >= 1);
 
                         if ($blocked->isNotEmpty()) {
                             \Filament\Notifications\Notification::make()
                                 ->title('Cannot delete selected items')
-                                ->body('One or more items have available quantity and cannot be deleted.')
+                                ->body('Some items have available quantity > 0')
                                 ->danger()
                                 ->send();
 
-                            abort(403, 'Deletion blocked: Items with available quantity ≥ 1');
+                            abort(403, 'Deletion blocked.');
                         }
                     }),
             ])
             ->recordUrl(null);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            // Define any related models or relations
-        ];
     }
 
     public static function getPages(): array
@@ -176,26 +173,5 @@ class InventoryItemResource extends Resource
             'create' => Pages\CreateInventoryItem::route('/create'),
             'edit' => Pages\EditInventoryItem::route('/{record}/edit'),
         ];
-    }
-
-    protected static function generateItemCode(): string
-    {
-        $lastItem = InventoryItem::latest()->first();
-        $nextId = $lastItem ? $lastItem->id + 1 : 1;
-        $categoryCode = strtoupper(substr(request()->input('category', 'CAT'), 0, 3));
-        return $categoryCode . str_pad($nextId, 4, '0', STR_PAD_LEFT);
-    }
-
-    protected static function getCategoryOptions(): array
-    {
-        return Category::pluck('name', 'name')->toArray();
-    }
-
-    public static function addCategory(array $data)
-    {
-        $categoryName = ucfirst($data['new_category']);
-        if (!Category::where('name', $categoryName)->exists()) {
-            Category::create(['name' => $categoryName]);
-        }
     }
 }

@@ -137,3 +137,4 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 Route::view('/draft-bills', 'pos.draft-bills');
 Route::view('/orders', 'pos.orders');
+

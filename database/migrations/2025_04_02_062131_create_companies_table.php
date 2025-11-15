@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('secondary_phone')->nullable();
             $table->string('email');
             $table->date('started_date');
+            $table->string('logo')->nullable();
             $table->text('special_notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

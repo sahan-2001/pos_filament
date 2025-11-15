@@ -14,7 +14,7 @@ class Company extends Model
     protected $fillable = [
         'name', 'address_line_1', 'address_line_2', 'address_line_3',
         'city', 'postal_code', 'country', 'primary_phone', 'secondary_phone',
-        'email', 'started_date', 'special_notes', 'updated_by',
+        'email', 'started_date','logo' , 'special_notes', 'updated_by',
     ];
 
     protected $casts = [

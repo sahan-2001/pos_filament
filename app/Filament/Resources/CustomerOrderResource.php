@@ -145,9 +145,12 @@ class CustomerOrderResource extends Resource
                                             ->columns(7)
                                             ->columnSpanFull()
                                             ->reactive() 
-                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                                self::calculateOrderTotals($set, $get); // calculate summary after any row change
-                                            })
+                                            ->afterStateHydrated(function ($state, callable $set, callable $get) {
+                                                    self::calculateOrderTotals($set, $get);
+                                                })
+                                                ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                    self::calculateOrderTotals($set, $get); 
+                                                })
                                             ->schema([
                                                 // --- Inventory Item Select ---
                                                 Forms\Components\Select::make('inventory_item_id')

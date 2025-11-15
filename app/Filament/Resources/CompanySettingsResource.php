@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Unique;
 use App\Helpers\Countries; 
 use Illuminate\Database\Eloquent\Model;
+use Filament\Forms\Components\FileUpload;
 
 
 class CompanySettingsResource extends Resource
@@ -97,6 +98,15 @@ class CompanySettingsResource extends Resource
                                             ->required()
                                             ->displayFormat('Y-m-d')
                                             ->native(false),
+                                        
+                                        FileUpload::make('logo')
+                                            ->label('Company Logo')
+                                            ->image()
+                                            ->directory('company-logos')
+                                            ->maxSize(2048) 
+                                            ->imagePreviewHeight('150') 
+                                            ->nullable()
+                                            ->columnSpanFull(),
                                             
                                         Textarea::make('special_notes')
                                             ->columnSpanFull()

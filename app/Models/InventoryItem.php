@@ -16,7 +16,7 @@ class InventoryItem extends Model
     protected $fillable = [
         'item_code',
         'name',
-        'category',
+        'category_id', 
         'special_note',
         'uom',
         'available_quantity',
@@ -31,66 +31,35 @@ class InventoryItem extends Model
         'updated_by',
     ];
 
-    protected static function boot()
+    protected static function booted()
     {
-        parent::boot();
-
         static::creating(function ($model) {
-            // Generate a unique item code
-            $model->item_code = self::generateUniqueItemCode($model->category);
-            $model->created_by = auth()->id() ?? 1; // Default to user ID 1 if no auth
+            $model->created_by = auth()->id();
+            $model->updated_by = auth()->id();
         });
 
         static::updating(function ($model) {
-            $model->updated_by = auth()->id() ?? $model->updated_by ?? 1; // Keep existing or default to 1
+            $model->updated_by = auth()->id();
         });
     }
 
-    /**
-     * Generate a unique item code based on category
-     */
-    protected static function generateUniqueItemCode(string $category): string
+    // Add category relationship
+    public function categoryRelation()
     {
-        $categoryCode = strtoupper(substr($category, 0, 3));
-        $maxAttempts = 10;
-        $attempt = 0;
+        return $this->belongsTo(Category::class, 'category_id');
+    }
 
-        do {
-            $attempt++;
-            $lastItem = self::where('item_code', 'like', $categoryCode.'%')
-                ->orderBy('item_code', 'desc')
-                ->first();
-
-            if ($lastItem) {
-                // Extract the numeric part and increment
-                $numericPart = (int) substr($lastItem->item_code, 3);
-                $nextNumber = $numericPart + 1;
-            } else {
-                $nextNumber = 1;
-            }
-
-            $newCode = $categoryCode . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-            // Check if code already exists (unlikely but possible in race conditions)
-            $exists = self::where('item_code', $newCode)->exists();
-
-            if (!$exists) {
-                return $newCode;
-            }
-
-            // If we're here, the code exists - try again with a higher number
-            $nextNumber++;
-
-        } while ($attempt < $maxAttempts);
-
-        // If all attempts fail (extremely unlikely), fall back to UUID
-        return $categoryCode . substr(Str::uuid()->toString(), 0, 4);
+    // Keep the old category method for backward compatibility
+    public function getCategoryNameAttribute()
+    {
+        return $this->categoryRelation ? $this->categoryRelation->name : $this->category;
     }
 
     protected static $logAttributes = [
         'item_code',
         'name',
         'category',
+        'category_id',
         'special_note',
         'uom',
         'available_quantity',
@@ -110,6 +79,7 @@ class InventoryItem extends Model
                 'item_code',
                 'name',
                 'category',
+                'category_id',
                 'special_note',
                 'uom',
                 'available_quantity',
@@ -127,9 +97,6 @@ class InventoryItem extends Model
         return $this->hasMany(RegisterArrivalItem::class, 'item_id');
     }
 
-    /**
-     * Update available quantity with proper user context
-     */
     public function updateQuantity($newQuantity, $userId = null)
     {
         $this->available_quantity = $newQuantity;
@@ -137,9 +104,6 @@ class InventoryItem extends Model
         return $this->save();
     }
 
-    /**
-     * Decrement available quantity with proper user context
-     */
     public function decrementQuantity($quantity, $userId = null)
     {
         $this->available_quantity = $this->available_quantity - $quantity;
@@ -147,9 +111,6 @@ class InventoryItem extends Model
         return $this->save();
     }
 
-    /**
-     * Increment available quantity with proper user context
-     */
     public function incrementQuantity($quantity, $userId = null)
     {
         $this->available_quantity = $this->available_quantity + $quantity;

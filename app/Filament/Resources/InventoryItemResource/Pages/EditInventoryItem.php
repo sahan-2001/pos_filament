@@ -31,4 +31,9 @@ class EditInventoryItem extends EditRecord
                 ]),
         ];
     }
+
+    public static function getRedirectUrlAfterCreate(): string
+    {
+        return static::getUrl('index');
+    }
 }
